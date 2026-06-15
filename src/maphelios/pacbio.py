@@ -210,7 +210,9 @@ def get_max_across_contigs(counts_binned):
     return max(x[1].max() for x in counts_binned.values())
 
 
-def add_global_ticks(circos, xticks_by_interval, track_radii, track_width=2):
+def add_global_ticks(
+    circos, xticks_by_interval, track_radii, track_width=2, xticks_orient="vertical"
+):
     # 1. build contig sizes (local to this block)
     contig_names = [s.name for s in circos.sectors]
     contig_lengths = {s.name: (s.end - s.start) for s in circos.sectors}
@@ -229,7 +231,9 @@ def add_global_ticks(circos, xticks_by_interval, track_radii, track_width=2):
     # 4. draw ruler per sector (mapped global → local)
     for i, sector in enumerate(circos.sectors):
 
-        ruler = sector.add_track((38, 40), r_pad_ratio=0.1)
+        ruler = sector.add_track(
+            (track_radii - track_width, track_radii), r_pad_ratio=0.1
+        )
         ruler.axis(ec="none")
 
         ticks = []
@@ -249,7 +253,7 @@ def add_global_ticks(circos, xticks_by_interval, track_radii, track_width=2):
             ticks.append(local)
             labels.append(f"{g / 1_000_000:.1f} Mb")
 
-        ruler.xticks(ticks, labels, outer=False, label_orientation="vertical")
+        ruler.xticks(ticks, labels, outer=False, label_orientation=xticks_orient)
 
 
 def plot_single_track(
@@ -387,21 +391,9 @@ def plot_circos(
     palette = {name: color for name, color in zip(all_binned_contigs.keys(), palette)}
 
     for track_idx, (name, counts_binned) in enumerate(all_binned_contigs.items()):
-        if xticks_global:
-            # If global ticks are used, i.e. with their own track, then set
-            # xticks_per_track to None, so nothing is labelled in any of the
-            # tracks
-            xticks_per_track = None
-            # Add the new track just for xticks
-            add_global_ticks(
-                circos,
-                xticks_by_interval,
-                track_r_min - xticks_ruler_width,
-                xticks_ruler_width,
-            )
-        else:
-            xticks_per_track = xticks_by_interval if track_idx == 0 else None
-
+        xticks_per_track = None
+        if xticks_global is False and track_idx == 0:
+            xticks_per_track = xticks_by_interval
         plot_single_track(
             circos=circos,
             counts_binned=counts_binned,
@@ -416,6 +408,19 @@ def plot_circos(
             color=palette[name],
         )
 
+    if xticks_global:
+        # If global ticks are used, i.e. with their own track, then set
+        # xticks_per_track to None, so nothing is labelled in any of the
+        # tracks
+        # Add the new track just for xticks
+        add_global_ticks(
+            circos,
+            xticks_by_interval,
+            track_r_min - xticks_ruler_width,
+            xticks_ruler_width,
+            xticks_orient,
+        )
+
     fig = circos.plotfig()
     # Legend
     if legend is True:
@@ -424,7 +429,7 @@ def plot_circos(
         legend_opts = {"loc": "upper left"} | legend_kwargs
         add_legend(circos, palette.values(), palette.keys(), **legend_opts)
 
-    return fig
+    return fig, circos
 
 
 def qc_plots(data):
