@@ -773,6 +773,15 @@ def extract_features(feature, ranges_df, cov_threshold=1):
 
     # Strand / orientation
     strand = {1: "+", -1: "-", None: "."}.get(feature.location.strand)
+    
+    #product information
+    product = q.get("product", None)
+
+    #product source
+    product_source = q.get("product_source", None)
+
+    #interpro information
+    interpro = q.get("interpro", None)
 
     return {
         "start": gene_start,
