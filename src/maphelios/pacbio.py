@@ -781,6 +781,9 @@ def extract_features(feature, ranges_df, cov_threshold=1):
         "gene": gene_name,
         "kegg": kegg,
         "go": go_terms,
+        "product": product,
+        "product_source": product_source,
+        "interpro": interpro,
     }
 
 
