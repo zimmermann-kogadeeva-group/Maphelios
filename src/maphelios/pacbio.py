@@ -684,7 +684,7 @@ def plot_all_peaks(
         fig = seq_view_plot(
             genome[row.contig_name],
             mapping[mapping["reference_name"] == row.contig_name],
-            row.midpoint - start_buf,
+            row.midpoint - start_buf
             row.midpoint + end_buf,
         )
         if output_prefix is not None:
@@ -699,21 +699,21 @@ def plot_bp_coverage(counts_df, ax=None, log_scale=True, vlines_kwargs=None, **k
     if ax is None:
         fig, ax = plt.subplots()
 
-    vlines_opts = dict(ls="--", lw=2, color="black")
+    vlines_opts = dict(ls="--", lw=1.5 color="black", label=f"Mean = {mean:.1f}")
     if vlines_kwargs is None:
         vlines_kwargs = {}
     vlines_kwargs = vlines_opts | vlines_kwargs
 
-    mean, std = counts_df.counts.describe().loc[["mean", "std"]]
+    mean = counts_df["counts"].mean() 
 
     sns.histplot(counts_df, x="counts", ax=ax, **kwargs)
     if log_scale:
         ax.set_yscale("log")
 
     # Mean
-    ax.axvline(mean, **vlines_kwargs, label="mean")
+    ax.axvline(mean, **vlines_kwargs)
     ax.legend()
-
+    
     return ax
 
 
