@@ -684,7 +684,7 @@ def plot_all_peaks(
         fig = seq_view_plot(
             genome[row.contig_name],
             mapping[mapping["reference_name"] == row.contig_name],
-            row.midpoint - start_buf
+            row.midpoint - start_buf,
             row.midpoint + end_buf,
         )
         if output_prefix is not None:
