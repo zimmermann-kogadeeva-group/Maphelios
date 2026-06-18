@@ -164,6 +164,7 @@ class Mapping(object):
         genome_file=None,
         search_term=None,
         retmax=200,
+        email=None,
         fwd_suffix=None,
         rev_suffix=None,
         blast_clean=True,
@@ -203,7 +204,7 @@ class Mapping(object):
             raise ValueError("Either genome_file or search_term needs to be given")
 
         self.genome = get_genome(
-            self.genome_file, self.genome_fasta, search_term, retmax
+            self.genome_file, self.genome_fasta, search_term, retmax, email
         )
         self.total_genome_length = sum(
             [len(x) for x in self.genome.values() if x.seq.defined]

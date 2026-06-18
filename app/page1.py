@@ -5,8 +5,8 @@ from tempfile import TemporaryDirectory
 import streamlit as st
 from Bio import SeqIO
 
-from plotting_on_genome import Mapping
-from plotting_on_genome.helper import quality_filter
+from maphelios import Mapping
+from maphelios.helper import quality_filter
 
 INPUT_FORMATS = {
     "fasta": "fasta",
@@ -51,8 +51,12 @@ def get_main_inputs(workdir=False):
             key="search_term",
         ).split(",")
 
-        retmax = st.text_input(
-            "Retmax (Max. # of records from NCBI)", 200, key="retmax"
+        retmax = st.number_input(
+            "Retmax (Max. # of records from NCBI)",
+            value=200,
+            min_value=1,
+            step=1,
+            key="retmax",
         )
     else:
         genome_fh = st.file_uploader(

@@ -5,7 +5,7 @@ import streamlit as st
 from page1 import get_main_inputs, run_pipeline
 from page2 import show_results
 
-from plotting_on_genome import __version__
+from maphelios import __version__
 
 st.set_page_config(layout="wide")
 

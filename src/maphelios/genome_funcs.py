@@ -1,3 +1,4 @@
+import os
 import subprocess
 import warnings
 from hashlib import sha1
@@ -7,9 +8,10 @@ from BCBio import GFF
 from Bio import Entrez, SearchIO, SeqIO
 
 
-def _download_genome(search_term, retmax=100):
-    # Set the email address for NCBI queries
-    # Entrez.email = email
+def _download_genome(search_term, retmax=100, email=None):
+    # Set the email address for NCBI queries (required by NCBI). Falls back to
+    # the NCBI_EMAIL environment variable when not passed explicitly.
+    Entrez.email = email or os.environ.get("NCBI_EMAIL")
 
     # Get record ids from NCBI
     with warnings.catch_warnings():
@@ -30,10 +32,10 @@ def _download_genome(search_term, retmax=100):
     return data_gb
 
 
-def download_genome(search_term, retmax=100, output_path=None):
+def download_genome(search_term, retmax=100, output_path=None, email=None):
 
     if output_path is None:
-        data_gb = _download_genome(search_term, retmax)
+        data_gb = _download_genome(search_term, retmax, email)
 
     else:
         output_path = Path(output_path)
@@ -45,7 +47,7 @@ def download_genome(search_term, retmax=100, output_path=None):
 
         # Otherwise retrieve the records from NCBI
         else:
-            data_gb = _download_genome(search_term, retmax)
+            data_gb = _download_genome(search_term, retmax, email)
             SeqIO.write(data_gb.values(), output_path, "genbank")
 
     return data_gb
@@ -58,10 +60,10 @@ def get_genome_file(work_dir, search_term, retmax):
     return work_dir / f"db_{search_hashed}.gbk"
 
 
-def get_genome(genome_file, genome_fasta, search_term=None, retmax=None):
+def get_genome(genome_file, genome_fasta, search_term=None, retmax=None, email=None):
     # Get genome
     if search_term is not None:
-        genome = download_genome(search_term, retmax, genome_file)
+        genome = download_genome(search_term, retmax, genome_file, email)
     else:
         if genome_file.suffix == ".gff":
             genome = SeqIO.to_dict(GFF.parse(genome_file))

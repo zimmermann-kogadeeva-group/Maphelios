@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 from plotting import plot_genomes, plot_inserts, plot_inserts_dist
 
-import plotting_on_genome as pog
+import maphelios as mh
 
 
 @st.cache_data
@@ -116,7 +116,7 @@ def get_table_query(seq_ids, clusters):
 def show_results():
 
     if st.session_state.results is not None:
-        all_results = pog.Comparison(st.session_state.results)
+        all_results = mh.Comparison(st.session_state.results)
 
         params = sidebar_opts()
 

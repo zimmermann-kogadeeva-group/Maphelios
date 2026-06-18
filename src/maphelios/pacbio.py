@@ -69,7 +69,9 @@ def get_aln_df(filename, dropna, drop_non_ccs, add_directions):
     with pysam.AlignmentFile(filename, "rb") as samfile:
         rows = [[getattr(read, attr) for attr in attr_names] for read in samfile]
 
-    df = pd.DataFrame(rows, columns=attr_names)
+    df = pd.DataFrame(rows, columns=attr_names).assign(
+        strand=lambda x: np.where(x.flag == 0, "top", "bottom")
+    )
 
     if dropna:
         df = df.dropna(subset=["reference_end"])
@@ -697,7 +699,7 @@ def plot_bp_coverage(counts_df, ax=None, log_scale=True, vlines_kwargs=None, **k
     if ax is None:
         fig, ax = plt.subplots()
 
-    vlines_opts = dict(lw=2, color="black")
+    vlines_opts = dict(ls="--", lw=2, color="black")
     if vlines_kwargs is None:
         vlines_kwargs = {}
     vlines_kwargs = vlines_opts | vlines_kwargs
@@ -709,11 +711,9 @@ def plot_bp_coverage(counts_df, ax=None, log_scale=True, vlines_kwargs=None, **k
         ax.set_yscale("log")
 
     # Mean
-    ax.axvline(mean, ls="-", **vlines_kwargs)
+    ax.axvline(mean, **vlines_kwargs, label="mean")
+    ax.legend()
 
-    # +/-  2 * std lines
-    ax.axvline(mean - 2 * std, ls="--", **vlines_kwargs)
-    ax.axvline(mean + 2 * std, ls="--", **vlines_kwargs)
     return ax
 
 
@@ -773,14 +773,14 @@ def extract_features(feature, ranges_df, cov_threshold=1):
 
     # Strand / orientation
     strand = {1: "+", -1: "-", None: "."}.get(feature.location.strand)
-    
-    #product information
+
+    # product information
     product = q.get("product", None)
 
-    #product source
+    # product source
     product_source = q.get("product_source", None)
 
-    #interpro information
+    # interpro information
     interpro = q.get("interpro", None)
 
     return {
