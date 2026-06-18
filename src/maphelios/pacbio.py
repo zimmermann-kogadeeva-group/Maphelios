@@ -699,7 +699,7 @@ def plot_bp_coverage(counts_df, ax=None, log_scale=True, vlines_kwargs=None, **k
     if ax is None:
         fig, ax = plt.subplots()
 
-    vlines_opts = dict(ls="--", lw=1.5 color="black", label=f"Mean = {mean:.1f}")
+    vlines_opts = dict(ls="--", lw=1.5, color="black", label=f"Mean = {mean:.1f}")
     if vlines_kwargs is None:
         vlines_kwargs = {}
     vlines_kwargs = vlines_opts | vlines_kwargs
