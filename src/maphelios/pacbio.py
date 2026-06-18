@@ -699,12 +699,12 @@ def plot_bp_coverage(counts_df, ax=None, log_scale=True, vlines_kwargs=None, **k
     if ax is None:
         fig, ax = plt.subplots()
 
+    mean = counts_df["counts"].mean()
+
     vlines_opts = dict(ls="--", lw=1.5, color="black", label=f"Mean = {mean:.1f}")
     if vlines_kwargs is None:
         vlines_kwargs = {}
     vlines_kwargs = vlines_opts | vlines_kwargs
-
-    mean = counts_df["counts"].mean() 
 
     sns.histplot(counts_df, x="counts", ax=ax, **kwargs)
     if log_scale:
