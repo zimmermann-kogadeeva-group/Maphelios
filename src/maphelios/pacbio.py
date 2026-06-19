@@ -158,18 +158,18 @@ def bin_intervals(starts, ends, length, width=10_000):
 
 def _bin_all_contigs(mapping, contig_lengths, bin_size=1000, as_df=False):
 
-    counts = {
-        contig: bin_intervals(
-            *mapping.query(f"reference_name in '{contig}'")
+    counts = {}
+    for contig, contig_len in contig_lengths.items():
+        starts, ends = (
+            mapping.dropna(subset="reference_end")
+            .query(f"reference_name in '{contig}'")
             .get(["reference_start", "reference_end"])
-            .to_numpy()
+            .to_numpy(dtype=int)
             .transpose()
-            .tolist(),
-            contig_len,
-            bin_size,
         )
-        for contig, contig_len in contig_lengths.items()
-    }
+
+        counts[contig] = bin_intervals(starts, ends, contig_len, bin_size)
+
     if as_df:
         return pd.concat(
             [
