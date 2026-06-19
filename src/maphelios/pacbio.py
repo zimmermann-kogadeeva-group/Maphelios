@@ -804,12 +804,12 @@ def get_gene_orient(data, strand_col="strand"):
     )
 
 
-def plot_gene_orient(data, strand_col="strand", y_col="fraction", ax=None):
+def plot_gene_orient(data, strand_col="strand", y_col="fraction", ax=None, **kwargs):
     if ax is None:
         fig, ax = plt.subplots()
 
     df_genes_orient = get_gene_orient(data, strand_col)
-    sns.barplot(df_genes_orient, x=strand_col, y=y_col, ax=ax)
+    sns.barplot(df_genes_orient, x=strand_col, y=y_col, ax=ax, **kwargs)
 
     return ax
 
