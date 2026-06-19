@@ -151,7 +151,7 @@ def bin_intervals(starts, ends, length, width=10_000):
     min_length = int(ends.max() // width) + 2
 
     starts_binned = np.bincount(starts // width, minlength=n_bins + min_length)
-    ends_binned = np.bincount((ends // width) + 1, minlength=n_bins + min_length)
+    ends_binned = np.bincount((ends - 1) // width + 1, minlength=n_bins + min_length)
     counts = np.cumsum(starts_binned - ends_binned)[:n_bins]
 
     return bins, counts
