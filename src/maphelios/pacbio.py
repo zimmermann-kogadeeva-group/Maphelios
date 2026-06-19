@@ -147,10 +147,11 @@ def get_contig_lengths(genome_path):
 def bin_intervals(starts, ends, length, width=10_000):
     bins = np.arange(0, length + width, width)
 
-    n_bins = int(np.ceil(length / width))
+    n_bins = len(bins)
+    min_length = int(ends.max() // width) + 2
 
-    starts_binned = np.bincount(starts // width, minlength=n_bins + 1)
-    ends_binned = np.bincount((ends // width) + 1, minlength=n_bins + 1)
+    starts_binned = np.bincount(starts // width, minlength=n_bins + min_length)
+    ends_binned = np.bincount((ends // width) + 1, minlength=n_bins + min_length)
     counts = np.cumsum(starts_binned - ends_binned)[:n_bins]
 
     return bins, counts
