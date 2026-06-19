@@ -147,14 +147,11 @@ def get_contig_lengths(genome_path):
 def bin_intervals(starts, ends, length, width=10_000):
     bins = np.arange(0, length + width, width)
 
-    # Initialize counts
-    counts = np.zeros(len(bins) - 1, dtype=int)
+    n_bins = int(np.ceil(length / width))
 
-    for i, (start, end) in enumerate(zip(starts, ends)):
-        # Find overlapping bins - start of seq must be less than end of bin and
-        # end of seq must be greater than beginning of bin
-        overlapping = np.where((start < bins[1:]) & (end > bins[:-1]))[0]
-        counts[overlapping] += 1
+    starts_binned = np.bincount(starts // width, minlength=n_bins + 1)
+    ends_binned = np.bincount((ends // width) + 1, minlength=n_bins + 1)
+    counts = np.cumsum(starts_binned - ends_binned)[:n_bins]
 
     return bins, counts
 
@@ -165,7 +162,8 @@ def _bin_all_contigs(mapping, contig_lengths, bin_size=1000, as_df=False):
         contig: bin_intervals(
             *mapping.query(f"reference_name in '{contig}'")
             .get(["reference_start", "reference_end"])
-            .values.transpose()
+            .get_numpy()
+            .transpose()
             .tolist(),
             contig_len,
             bin_size,
@@ -713,7 +711,7 @@ def plot_bp_coverage(counts_df, ax=None, log_scale=True, vlines_kwargs=None, **k
     # Mean
     ax.axvline(mean, **vlines_kwargs)
     ax.legend()
-    
+
     return ax
 
 
