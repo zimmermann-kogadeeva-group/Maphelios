@@ -162,7 +162,7 @@ def _bin_all_contigs(mapping, contig_lengths, bin_size=1000, as_df=False):
         contig: bin_intervals(
             *mapping.query(f"reference_name in '{contig}'")
             .get(["reference_start", "reference_end"])
-            .get_numpy()
+            .to_numpy()
             .transpose()
             .tolist(),
             contig_len,
