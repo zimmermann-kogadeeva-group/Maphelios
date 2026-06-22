@@ -148,7 +148,7 @@ def bin_intervals(starts, ends, length, width=10_000):
     bins = np.arange(0, length + width, width)
 
     n_bins = len(bins) - 1
-    min_length = int(ends.max() // width) + 2
+    min_length = n_bins + 2  # +2 as buffer
 
     starts_binned = np.bincount(starts // width, minlength=min_length)
     ends_binned = np.bincount((ends - 1) // width + 1, minlength=min_length)
@@ -353,14 +353,22 @@ def plot_circos(
         )
 
     if track_sep is not None:
-        all_binned_contigs = {
-            name: bin_all_contigs(g, contig_lengths, bin_size=bin_size)
-            for name, g in mapping.groupby(track_sep)
-        }
+        all_binned_contigs = bin_all_contigs(
+            mapping, contig_lengths, bin_size=bin_size, group=track_sep
+        )
     else:
         all_binned_contigs = {
             "all": bin_all_contigs(mapping, contig_lengths, bin_size=bin_size)
         }
+
+    # y-axis settings
+    y_maxs = {
+        track: get_max_across_contigs(counts_binned)
+        for track, counts_binned in all_binned_contigs.items()
+    }
+    if same_y_scale:
+        y_max = max(y_maxs.values())
+        y_maxs = {name: y_max for name, val in y_maxs.items()}
 
     num_tracks = len(all_binned_contigs)
     track_r_vals = np.linspace(track_r_min, track_r_max, num_tracks + 1)
@@ -376,15 +384,6 @@ def plot_circos(
     if title is not None:
         fig_title = title + "\n" + fig_title
     circos.text(fig_title, size=13)
-
-    # y-axis settings
-    y_maxs = {
-        name: get_max_across_contigs(counts_binned)
-        for name, counts_binned in all_binned_contigs.items()
-    }
-    if same_y_scale:
-        y_max = max(y_maxs.values())
-        y_maxs = {name: y_max for name, val in y_maxs.items()}
 
     # colors
     if isinstance(palette, str):
