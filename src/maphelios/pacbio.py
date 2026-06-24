@@ -50,8 +50,12 @@ def reorder_cols(data, cols):
     return data.get(cols_in_data + rest_cols)
 
 
+def get_tags(read, tags):
+    return [read.get_tag(tag) if read.has_tag(tag) else None for tag in tags]
+
+
 def get_aln_df(filename, dropna, drop_non_ccs, add_directions):
-    attr_names = (
+    attr_names = [
         "reference_name",
         "reference_start",
         "reference_end",
@@ -64,12 +68,16 @@ def get_aln_df(filename, dropna, drop_non_ccs, add_directions):
         "flag",
         "is_secondary",
         "is_supplementary",
-    )
+    ]
+    tags = ["AS", "XS"]
 
     with pysam.AlignmentFile(filename, "rb") as samfile:
-        rows = [[getattr(read, attr) for attr in attr_names] for read in samfile]
+        rows = [
+            [getattr(read, attr) for attr in attr_names] + get_tags(read, tags)
+            for read in samfile
+        ]
 
-    df = pd.DataFrame(rows, columns=attr_names).assign(
+    df = pd.DataFrame(rows, columns=attr_names + tags).assign(
         strand=lambda x: np.where(x.flag == 0, "top", "bottom")
     )
 
