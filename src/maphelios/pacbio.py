@@ -152,7 +152,7 @@ def get_contig_lengths(genome_path):
     return {k: len(v) for k, v in genome.items()}
 
 
-def bin_intervals(starts, ends, length, width=10_000):
+def bin_intervals(starts, ends, length, width=10_000, log_scale=False):
     bins = np.arange(0, length + width, width)
 
     n_bins = len(bins) - 1
@@ -161,11 +161,15 @@ def bin_intervals(starts, ends, length, width=10_000):
     starts_binned = np.bincount(starts // width, minlength=min_length)
     ends_binned = np.bincount((ends - 1) // width + 1, minlength=min_length)
     counts = np.cumsum(starts_binned - ends_binned)[:n_bins]
+    if log_scale:
+        counts = np.log(1 + counts)
 
     return bins, counts
 
 
-def _bin_all_contigs(mapping, contig_lengths, bin_size=1000, as_df=False):
+def _bin_all_contigs(
+    mapping, contig_lengths, bin_size=1000, as_df=False, log_scale=False
+):
 
     counts = {}
     for contig, contig_len in contig_lengths.items():
@@ -177,7 +181,7 @@ def _bin_all_contigs(mapping, contig_lengths, bin_size=1000, as_df=False):
             .transpose()
         )
 
-        counts[contig] = bin_intervals(starts, ends, contig_len, bin_size)
+        counts[contig] = bin_intervals(starts, ends, contig_len, bin_size, log_scale)
 
     if as_df:
         return pd.concat(
@@ -193,12 +197,18 @@ def _bin_all_contigs(mapping, contig_lengths, bin_size=1000, as_df=False):
     return counts
 
 
-def bin_all_contigs(mapping, contig_lengths, bin_size=1000, group=None, as_df=False):
+def bin_all_contigs(
+    mapping, contig_lengths, bin_size=1000, group=None, as_df=False, log_scale=False
+):
     if group is None:
-        return _bin_all_contigs(mapping, contig_lengths, bin_size, as_df=as_df)
+        return _bin_all_contigs(
+            mapping, contig_lengths, bin_size, as_df=as_df, log_scale=log_scale
+        )
 
     grouped_counts = {
-        name: _bin_all_contigs(g, contig_lengths, bin_size, as_df=as_df)
+        name: _bin_all_contigs(
+            g, contig_lengths, bin_size, as_df=as_df, log_scale=log_scale
+        )
         for name, g in mapping.groupby(group)
     }
 
@@ -277,6 +287,7 @@ def plot_single_track(
     xticks_by_interval=None,
     xticks_orient="vertical",
     color="violet",
+    log_scale=False,
 ):
     if y_max is None:
         y_max = get_max_across_contigs(counts_binned)
@@ -286,6 +297,10 @@ def plot_single_track(
             f"y_step was too large ({y_step} > {y_max}): changed y_step to {new_y_step}"
         )
         y_step = new_y_step
+    y_ticks = np.arange(0, y_max + y_step, y_step)
+    y_labels = list(map(str, y_ticks))
+    if log_scale:
+        y_labels = [f"$10^{int(x)}$" for x in y_ticks]
 
     # Calculcate offset for global x-axis labelling
     offset = 0
@@ -306,8 +321,7 @@ def plot_single_track(
         # unique y-ticks per track, shared between different contigs per track
         # can be different between different tracks
         if i == 0:
-            y_ticks = np.arange(0, y_max + y_step, y_step)
-            track.yticks(y_ticks, list(map(str, y_ticks)))
+            track.yticks(y_ticks, y_labels)
 
         # X ticks
         if xticks_by_interval is not None:
@@ -349,6 +363,7 @@ def plot_circos(
     palette="tab10",
     legend=False,
     legend_kwargs=None,
+    log_scale=False,
 ):
 
     contig_lengths = {k: len(v) for k, v in genome.items()}
@@ -362,11 +377,17 @@ def plot_circos(
 
     if track_sep is not None:
         all_binned_contigs = bin_all_contigs(
-            mapping, contig_lengths, bin_size=bin_size, group=track_sep
+            mapping,
+            contig_lengths,
+            bin_size=bin_size,
+            group=track_sep,
+            log_scale=log_scale,
         )
     else:
         all_binned_contigs = {
-            "all": bin_all_contigs(mapping, contig_lengths, bin_size=bin_size)
+            "all": bin_all_contigs(
+                mapping, contig_lengths, bin_size=bin_size, log_scale=log_scale
+            )
         }
 
     # y-axis settings
@@ -414,6 +435,7 @@ def plot_circos(
             xticks_by_interval=xticks_per_track,
             xticks_orient=xticks_orient,
             color=palette[name],
+            log_scale=log_scale,
         )
 
     if xticks_global:
