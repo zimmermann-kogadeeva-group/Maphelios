@@ -300,7 +300,7 @@ def plot_single_track(
     y_ticks = np.arange(0, y_max + y_step, y_step)
     y_labels = list(map(str, y_ticks))
     if log_scale:
-        y_labels = [f"$10^{int(x)}$" for x in y_ticks]
+        y_labels = [f"$10^{{{int(x)}}}$" for x in y_ticks]
 
     # Calculcate offset for global x-axis labelling
     offset = 0
