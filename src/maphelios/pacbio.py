@@ -162,7 +162,7 @@ def bin_intervals(starts, ends, length, width=10_000, log_scale=False):
     ends_binned = np.bincount((ends - 1) // width + 1, minlength=min_length)
     counts = np.cumsum(starts_binned - ends_binned)[:n_bins]
     if log_scale:
-        counts = np.log(1 + counts)
+        counts = np.log10(1 + counts)
 
     return bins, counts
 
@@ -288,6 +288,7 @@ def plot_single_track(
     xticks_orient="vertical",
     color="violet",
     log_scale=False,
+    track_axis_kwargs=None,
 ):
     if y_max is None:
         y_max = get_max_across_contigs(counts_binned)
@@ -302,6 +303,9 @@ def plot_single_track(
     if log_scale:
         y_labels = [f"$10^{{{int(x)}}}$" for x in y_ticks]
 
+    if track_axis_kwargs is None:
+        track_axis_kwargs = {}
+
     # Calculcate offset for global x-axis labelling
     offset = 0
     for i, sector in enumerate(circos.sectors):
@@ -314,8 +318,8 @@ def plot_single_track(
 
         # Create tracks
         track = sector.add_track(track_radii, r_pad_ratio=r_pad_ratio)
-        track.axis()
         track.grid()
+        track.axis(**track_axis_kwargs)
         track.fill_between(x, counts_binned[sector.name][1], vmax=y_max, color=color)
 
         # unique y-ticks per track, shared between different contigs per track
@@ -354,6 +358,7 @@ def plot_circos(
     track_r_max=100,
     track_r_sep=5,
     track_r_pad=0.1,
+    track_axis_kwargs=None,
     xticks_by_interval=1_000_000,
     xticks_orient="vertical",
     xticks_global=True,
@@ -436,6 +441,7 @@ def plot_circos(
             xticks_orient=xticks_orient,
             color=palette[name],
             log_scale=log_scale,
+            track_axis_kwargs=track_axis_kwargs,
         )
 
     if xticks_global:
