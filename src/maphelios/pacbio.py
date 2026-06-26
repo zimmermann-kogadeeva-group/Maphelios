@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import gzip
+from collections import OrderedDict
 from copy import deepcopy
 from functools import lru_cache, wraps
 from itertools import cycle
@@ -348,6 +349,27 @@ def add_legend(circos, colors, labels, loc="upper left", **kwargs):
     circos.ax.add_artist(line_legend)
 
 
+def ordered_items(d, order=None, *, key=None, reverse=False):
+    """Yield (key, value) pairs from a dict in a specific order.
+
+    - order: an explicit iterable of keys defining the sequence
+    - key:   a sort function (applied to (k, v) tuples) if no explicit order
+    - reverse: reverse the sort
+    If neither is given, falls back to insertion order.
+    """
+    new_dict = OrderedDict()
+    if order is not None:
+        for k in order:
+            new_dict[k] = d[k]
+    elif key is not None:
+        for k, v in sorted(d.items(), key=key, reverse=reverse):
+            new_dict[k] = v
+    else:
+        for k, v in d.items():
+            new_dict[k] = d[k]
+    return new_dict
+
+
 def plot_circos(
     mapping,
     genome,
@@ -369,10 +391,26 @@ def plot_circos(
     legend=False,
     legend_kwargs=None,
     log_scale=False,
+    order_sectors=None,
 ):
 
     contig_lengths = {k: len(v) for k, v in genome.items()}
     full_genome_length = sum(contig_lengths.values())
+
+    if order_sectors is not None:
+        if isinstance(order_sectors, str):
+            if order_sectors.lower() not in ("asc", "desc"):
+                raise ValueError("order_sectors can only be 'asc' or 'desc'")
+            reverse = True if order_sectors == "desc" else False
+            contig_lengths = ordered_items(
+                contig_lengths,
+                key=lambda x: x[1],
+                reverse=reverse,
+            )
+        elif isinstance(order_sectors, (list, tuple)):
+            contig_lengths = ordered_items(contig_lengths, order=order_sectors)
+        else:
+            raise ValueError(f"Unknown type for order_sectors: {type(order_sectors)}")
 
     aln_contigs = set(mapping.reference_name.unique())
     if not set(genome.keys()).issuperset(aln_contigs):
