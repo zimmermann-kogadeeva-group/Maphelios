@@ -319,14 +319,14 @@ def plot_single_track(
 
         # Create tracks
         track = sector.add_track(track_radii, r_pad_ratio=r_pad_ratio)
-        track.grid()
+        track.grid(y_grid_num=len(y_ticks))
         track.axis(**track_axis_kwargs)
         track.fill_between(x, counts_binned[sector.name][1], vmax=y_max, color=color)
 
         # unique y-ticks per track, shared between different contigs per track
         # can be different between different tracks
         if i == 0:
-            track.yticks(y_ticks, y_labels)
+            track.yticks(y_ticks, y_labels, side="left")
 
         # X ticks
         if xticks_by_interval is not None:
@@ -341,6 +341,9 @@ def plot_single_track(
 
 
 def add_legend(circos, colors, labels, loc="upper left", **kwargs):
+    # Default options - these are overwritten if provided as kwargs
+    kwargs = {"loc": "upper left"} | kwargs
+
     # Plot legend
     line_handles = [
         Line2D([], [], color=color, label=label) for color, label in zip(colors, labels)
@@ -368,6 +371,23 @@ def ordered_items(d, order=None, *, key=None, reverse=False):
         for k, v in d.items():
             new_dict[k] = d[k]
     return new_dict
+
+
+def order_contigs(contig_lengths, order_sectors):
+    if isinstance(order_sectors, str):
+        if order_sectors.lower() not in ("asc", "desc"):
+            raise ValueError("order_sectors can only be 'asc' or 'desc'")
+        reverse = True if order_sectors == "desc" else False
+        contig_lengths = ordered_items(
+            contig_lengths,
+            key=lambda x: x[1],
+            reverse=reverse,
+        )
+    elif isinstance(order_sectors, (list, tuple)):
+        contig_lengths = ordered_items(contig_lengths, order=order_sectors)
+    else:
+        raise ValueError(f"Unknown type for order_sectors: {type(order_sectors)}")
+    return contig_lengths
 
 
 def plot_circos(
@@ -398,19 +418,7 @@ def plot_circos(
     full_genome_length = sum(contig_lengths.values())
 
     if order_sectors is not None:
-        if isinstance(order_sectors, str):
-            if order_sectors.lower() not in ("asc", "desc"):
-                raise ValueError("order_sectors can only be 'asc' or 'desc'")
-            reverse = True if order_sectors == "desc" else False
-            contig_lengths = ordered_items(
-                contig_lengths,
-                key=lambda x: x[1],
-                reverse=reverse,
-            )
-        elif isinstance(order_sectors, (list, tuple)):
-            contig_lengths = ordered_items(contig_lengths, order=order_sectors)
-        else:
-            raise ValueError(f"Unknown type for order_sectors: {type(order_sectors)}")
+        contig_lengths = order_contigs(contig_lengths, order_sectors)
 
     aln_contigs = set(mapping.reference_name.unique())
     if not set(genome.keys()).issuperset(aln_contigs):
@@ -500,8 +508,7 @@ def plot_circos(
     if legend is True:
         if legend_kwargs is None:
             legend_kwargs = {}
-        legend_opts = {"loc": "upper left"} | legend_kwargs
-        add_legend(circos, palette.values(), palette.keys(), **legend_opts)
+        add_legend(circos, palette.values(), palette.keys(), **legend_kwargs)
 
     return fig, circos
 
