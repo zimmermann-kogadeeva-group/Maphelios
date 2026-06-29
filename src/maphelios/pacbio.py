@@ -412,6 +412,7 @@ def plot_circos(
     legend_kwargs=None,
     log_scale=False,
     order_sectors=None,
+    circos_kwargs=None,
 ):
 
     contig_lengths = {k: len(v) for k, v in genome.items()}
@@ -457,7 +458,9 @@ def plot_circos(
     ]
 
     # Initialize circos instance
-    circos = Circos(sectors=contig_lengths)
+    if circos_kwargs is None:
+        circos_kwargs = dict(start=0, end=350)
+    circos = Circos(sectors=contig_lengths, **circos_kwargs)
 
     # Set title
     fig_title = f"({full_genome_length:,} bp)"
