@@ -937,20 +937,18 @@ def get_strand_count_no_cov(mapping, genome, cov_threshold=0.9):
         .pivot(index="orientation", columns="strand", values="count")
     )
 
+
 def plot_gene_orient_stacked(
-    df, 
-    title="Gene orientation of missing genes", 
-    xlabel_rotation=0, 
-    legend_title="strand", 
+    data,
     colour=False,
     ax=None,
-    ):
+):
     if ax is None:
         fig, ax = plt.subplots()
-    
-    df.plot(kind="bar", stacked=True, color=colour, ax=ax)
-    ax.set_title(title)
-    ax.tick_params(labelrotation=xlabel_rotation)
-    ax.legend(title=legend_title)
-    
+
+    data.plot(kind="bar", stacked=True, color=colour, ax=ax)
+    ax.set_title("Gene orientation of missing genes")
+    ax.tick_params(labelrotation=0)
+    ax.legend(title="strand")
+
     return ax
