@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "maphelios"
-version = "0.8.12"
+version = "0.8.13"
 requires-python = ">=3.9"
 description = "Package for making genome related plots"
 readme = "README.md"
@@ -38,7 +38,7 @@ profile = "black"
 src_paths = ["src", "tests"]
 
 [tool.bumpver]
-current_version = "0.8.12"
+current_version = "0.8.13"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message  = "Bump version {old_version} -> {new_version}"
 commit          = true
