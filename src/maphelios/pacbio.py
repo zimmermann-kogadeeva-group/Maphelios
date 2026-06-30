@@ -904,3 +904,35 @@ def get_genes_within_regions(genome, regions_df, cov_threshold=1):
             for feature in record.features
         ]
     ).dropna(subset="start")
+
+
+def get_strand_count_no_cov(mapping, genome, cov_threshold=0.9):
+    df_zero = regions_without_cov(mapping)
+    df_zero_ann = get_genes_within_regions(genome, df_zero, cov_threshold=cov_threshold)
+
+    df_zero = regions_without_cov(mapping.query("read_direction == 'fwd'"))
+    df_zero_fwd_ann = get_genes_within_regions(
+        genome, df_zero, cov_threshold=cov_threshold
+    )
+
+    df_zero = regions_without_cov(mapping.query("read_direction == 'rev'"))
+    df_zero_rev_ann = get_genes_within_regions(
+        genome, df_zero, cov_threshold=cov_threshold
+    )
+
+    df_all = pd.concat(
+        [
+            df.assign(orientation=name)
+            for name, df in zip(
+                ["both", "regular", "inverted"],
+                [df_zero_ann, df_zero_fwd_ann, df_zero_rev_ann],
+            )
+        ],
+        ignore_index=True,
+    )
+
+    return (
+        df_all.groupby("orientation", as_index=False)
+        .strand.value_counts()
+        .pivot(index="orientation", columns="strand", values="count")
+    )
