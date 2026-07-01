@@ -340,7 +340,7 @@ def plot_single_track(
         offset += sector_width
 
 
-def add_legend(circos, colors, labels, loc="upper left", **kwargs):
+def add_legend(circos, colors, labels, loc="upper right", **kwargs):
     # Default options - these are overwritten if provided as kwargs
     kwargs = {"loc": "upper left"} | kwargs
 
@@ -348,7 +348,7 @@ def add_legend(circos, colors, labels, loc="upper left", **kwargs):
     line_handles = [
         Line2D([], [], color=color, label=label) for color, label in zip(colors, labels)
     ]
-    line_legend = circos.ax.legend(handles=line_handles, **kwargs)
+    line_legend = circos.ax.legend(handles=line_handles, loc=loc, **kwargs)
     circos.ax.add_artist(line_legend)
 
 
