@@ -341,8 +341,6 @@ def plot_single_track(
 
 
 def add_legend(circos, colors, labels, loc="upper right", **kwargs):
-    # Default options - these are overwritten if provided as kwargs
-    kwargs = {"loc": "upper left"} | kwargs
 
     # Plot legend
     line_handles = [
