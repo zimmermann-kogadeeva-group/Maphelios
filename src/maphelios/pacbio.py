@@ -411,6 +411,7 @@ def plot_circos(
     log_scale=False,
     order_sectors=None,
     circos_kwargs=None,
+    **kwargs,
 ):
 
     contig_lengths = {k: len(v) for k, v in genome.items()}
@@ -462,9 +463,12 @@ def plot_circos(
 
     # Set title
     fig_title = f"({full_genome_length:,} bp)"
+    title_fontsize = 13
+    if "title_fontsize" in kwargs:
+        title_fontsize = kwargs["title_fontsize"]
     if title is not None:
         fig_title = title + "\n" + fig_title
-    circos.text(fig_title, size=13)
+    circos.text(fig_title, size=title_fontsize)
 
     # colors
     if isinstance(palette, str):
