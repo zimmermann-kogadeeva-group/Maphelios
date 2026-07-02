@@ -93,14 +93,14 @@ def get_aln_df(filename, dropna, drop_non_ccs, add_directions):
                 x.query_name.str.extract("(?P<query_name>.*)_(?P<barcode_pos>[35]p)")
             )
         ).assign(
-            read_direction=lambda x: np.select(
+            insert_ori=lambda x: np.select(
                 [
                     (x.flag & 16 == 0) & (x.barcode_pos == "5p"),
                     (x.flag & 16 == 16) & (x.barcode_pos == "5p"),
                     (x.flag & 16 == 0) & (x.barcode_pos == "3p"),
                     (x.flag & 16 == 16) & (x.barcode_pos == "3p"),
                 ],
-                ["fwd", "rev", "rev", "fwd"],
+                ["regular", "inverted", "inverted", "regular"],
                 default=None,
             )
         )
@@ -917,12 +917,12 @@ def get_strand_count_no_cov(mapping, genome, cov_threshold=0.9):
     df_zero = regions_without_cov(mapping)
     df_zero_ann = get_genes_within_regions(genome, df_zero, cov_threshold=cov_threshold)
 
-    df_zero = regions_without_cov(mapping.query("read_direction == 'fwd'"))
+    df_zero = regions_without_cov(mapping.query("insert_ori == 'regular'"))
     df_zero_fwd_ann = get_genes_within_regions(
         genome, df_zero, cov_threshold=cov_threshold
     )
 
-    df_zero = regions_without_cov(mapping.query("read_direction == 'rev'"))
+    df_zero = regions_without_cov(mapping.query("insert_ori == 'inverted'"))
     df_zero_rev_ann = get_genes_within_regions(
         genome, df_zero, cov_threshold=cov_threshold
     )
