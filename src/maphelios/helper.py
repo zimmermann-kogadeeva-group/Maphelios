@@ -151,11 +151,11 @@ def get_genes_graphic_record(
     return record_hits
 
 
-def fig_axvline(axes, value, ls="--", color="gray", **kwargs):
+def fig_axvline(axes, value, ls="--", color="gray", zorder=-100, **kwargs):
     fig = axes[0].get_figure()
     transFigure = fig.transFigure.inverted()
 
-    coord1 = transFigure.transform(axes[0].transData.transform([value, 0]))
+    coord1 = transFigure.transform(axes[0].transData.transform([value, 1]))
     coord2 = transFigure.transform(axes[1].transData.transform([value, 0]))
 
     line = Line2D(
@@ -164,6 +164,6 @@ def fig_axvline(axes, value, ls="--", color="gray", **kwargs):
         ls=ls,
         color=color,
         transform=fig.transFigure,
-        zorder=-100,
+        zorder=zorder,
     )
     fig.lines.append(line)

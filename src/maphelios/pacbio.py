@@ -20,6 +20,8 @@ from matplotlib.lines import Line2D
 from pycirclize import Circos
 from scipy.signal import find_peaks
 
+from .helper import fig_axvline
+
 
 # Class with label_fields class attribute over-written - needed due to product element
 # being missing
@@ -593,11 +595,22 @@ def _draw_seqs(mapping, start, end, ax):
     ax.set_yticklabels([])
     ax.set_facecolor("white")
     ax.set_title("Sequences")
+    ax.set_xlim(start, end)
     ax.set_axis_off()
     return ax
 
 
-def seq_view_plot(contig, mapping, start, end, fig=None, figsize=None, fig_title=None):
+def seq_view_plot(
+    contig,
+    mapping,
+    start,
+    end,
+    fig=None,
+    figsize=None,
+    fig_title=None,
+    axvlines=None,
+    axvlines_kwargs=None,
+):
     if fig is None:
         figsize = (10, 7) if figsize is None else figsize
         fig, axs = plt.subplots(2, 1, figsize=figsize, sharex=True)
@@ -609,9 +622,20 @@ def seq_view_plot(contig, mapping, start, end, fig=None, figsize=None, fig_title
 
     rec_genes = _get_graphic_record_genes(contig, start, end)
     rec_genes.plot(ax=axs[1])
+    axs[1].set_xlim(start, end)
     axs[1].set_title("Genes")
     if fig_title is not None:
         fig.suptitle(fig_title)
+
+    if axvlines is not None:
+        axvlines_kwargs = {} if axvlines_kwargs is None else axvlines_kwargs
+        assert isinstance(axvlines_kwargs, dict)
+        axvlines_kwargs = {"color": "grey", "ls": "--"} | axvlines_kwargs
+        if isinstance(axvlines, (int, float)):
+            fig_axvline(axs, axvlines, **axvlines_kwargs)
+        else:
+            for value in axvlines:
+                fig_axvline(axs, value, **axvlines_kwargs)
     return fig
 
 
