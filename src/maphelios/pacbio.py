@@ -390,6 +390,17 @@ def order_contigs(contig_lengths, order_sectors):
     return contig_lengths
 
 
+def _format_palette(palette, contig_labels=None):
+    if isinstance(palette, str) or isinstance(palette, (tuple, list)):
+        if isinstance(palette, str):
+            palette = cycle(color_sequences[palette])
+        palette = {name: color for name, color in zip(contig_labels, palette)}
+    elif not isinstance(palette, dict):
+        raise ValueError(
+            f"palette can only be str, list, tuple or dict. Got {type(palette)}"
+        )
+
+
 def plot_circos(
     mapping,
     genome,
@@ -473,9 +484,7 @@ def plot_circos(
     circos.text(fig_title, size=title_fontsize)
 
     # colors
-    if isinstance(palette, str):
-        palette = cycle(color_sequences[palette])
-    palette = {name: color for name, color in zip(all_binned_contigs.keys(), palette)}
+    palette = _format_palette(palette, all_binned_contigs.keys())
 
     for track_idx, (name, counts_binned) in enumerate(all_binned_contigs.items()):
         xticks_per_track = None
