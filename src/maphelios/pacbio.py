@@ -395,10 +395,13 @@ def _format_palette(palette, contig_labels=None):
         if isinstance(palette, str):
             palette = cycle(color_sequences[palette])
         palette = {name: color for name, color in zip(contig_labels, palette)}
-    elif not isinstance(palette, dict):
+
+    if not isinstance(palette, dict):
         raise ValueError(
             f"palette can only be str, list, tuple or dict. Got {type(palette)}"
         )
+
+    return palette
 
 
 def plot_circos(
