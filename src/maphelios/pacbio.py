@@ -53,12 +53,38 @@ def reorder_cols(data, cols):
     return data.get(cols_in_data + rest_cols)
 
 
-def get_tags(read, tags):
-    return [read.get_tag(tag) if read.has_tag(tag) else None for tag in tags]
+def _blast_identity(read):
+    num_aln = 0
+    num_ins = 0
+    num_del = 0
+    num_match = 0
+    num_mismatch = 0
+    if read.cigartuples is not None:
+        for op, length in read.cigartuples:
+            if op == 0:
+                num_aln += length  # M  alignment column (match or mismatch)
+            elif op == 1:
+                num_ins += length  # I  insertion to reference
+            elif op == 2:
+                num_del += length  # D  deletion from reference
+            elif op == 7:
+                num_match += length  # =  exact match
+            elif op == 8:
+                num_mismatch += length  # X  mismatch
+            # 3=N, 4=S, 5=H, 6=P contribute nothing to identity
+
+    NM = 0
+    if read.has_tag("NM"):
+        NM = read.get_tag("NM")
+    aligned_cols = num_aln + num_match + num_mismatch
+    mismatches = NM - num_ins - num_del
+    matches = aligned_cols - mismatches
+    aln_len = aligned_cols + num_ins + num_del
+    return matches / aln_len if aln_len else 0.0
 
 
-def get_aln_df(filename, dropna, drop_non_ccs, add_directions):
-    attr_names = [
+def _get_read_values(read, tags=None, blast_like_score=False):
+    attr_names = (
         "reference_name",
         "reference_start",
         "reference_end",
@@ -71,16 +97,25 @@ def get_aln_df(filename, dropna, drop_non_ccs, add_directions):
         "flag",
         "is_secondary",
         "is_supplementary",
-    ]
-    tags = ["AS", "XS"]
+    )
+    read_vals = {attr: getattr(read, attr) for attr in attr_names}
+
+    for tag in ("AS", "XS"):
+        if read.has_tag(tag):
+            read_vals[tag] = read.get_tag(tag)
+
+    if blast_like_score:
+        read_vals["blast_like_score"] = _blast_identity(read)
+
+    return read_vals
+
+
+def get_aln_df(filename, dropna, drop_non_ccs, add_directions, **kwargs):
 
     with pysam.AlignmentFile(filename, "rb") as samfile:
-        rows = [
-            [getattr(read, attr) for attr in attr_names] + get_tags(read, tags)
-            for read in samfile
-        ]
+        rows = [_get_read_values(read, **kwargs) for read in samfile]
 
-    df = pd.DataFrame(rows, columns=attr_names + tags).assign(
+    df = pd.DataFrame(rows).assign(
         strand=lambda x: np.where(x.flag == 0, "top", "bottom")
     )
 
@@ -118,16 +153,14 @@ def get_longread_aln(
         dropna=dropna,
         drop_non_ccs=drop_non_css,
         add_directions=add_directions,
+        **kwargs,
     )
 
 
 @wraps(get_aln_df)
 def get_shortread_aln(filename, dropna=True, **kwargs):
     return get_aln_df(
-        filename,
-        dropna=dropna,
-        drop_non_ccs=False,
-        add_directions=False,
+        filename, dropna=dropna, drop_non_ccs=False, add_directions=False, **kwargs
     )
 
 
