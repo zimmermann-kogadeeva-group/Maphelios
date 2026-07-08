@@ -266,7 +266,12 @@ def get_max_across_contigs(counts_binned):
 
 
 def add_global_ticks(
-    circos, xticks_by_interval, track_radii, track_width=2, xticks_orient="vertical"
+    circos,
+    xticks_by_interval,
+    track_radii,
+    track_width=2,
+    xticks_orient="vertical",
+    **kwargs,
 ):
     # 1. build contig sizes (local to this block)
     contig_names = [s.name for s in circos.sectors]
@@ -308,7 +313,9 @@ def add_global_ticks(
             ticks.append(local)
             labels.append(f"{g / 1_000_000:.1f} Mb")
 
-        ruler.xticks(ticks, labels, outer=False, label_orientation=xticks_orient)
+        ruler.xticks(
+            ticks, labels, outer=False, label_orientation=xticks_orient, **kwargs
+        )
 
 
 def plot_single_track(
@@ -325,7 +332,11 @@ def plot_single_track(
     color="violet",
     log_scale=False,
     track_axis_kwargs=None,
+    xticks_kwargs=None,
 ):
+    track_axis_kwargs = dict() if track_axis_kwargs is None else track_axis_kwargs
+    xticks_kwargs = dict() if xticks_kwargs is None else xticks_kwargs
+
     if y_max is None:
         y_max = get_max_across_contigs(counts_binned)
     if y_step > y_max:
@@ -338,9 +349,6 @@ def plot_single_track(
     y_labels = list(map(str, y_ticks))
     if log_scale:
         y_labels = [f"$10^{{{int(x)}}}$" for x in y_ticks]
-
-    if track_axis_kwargs is None:
-        track_axis_kwargs = {}
 
     # Calculcate offset for global x-axis labelling
     offset = 0
@@ -370,6 +378,7 @@ def plot_single_track(
                 outer=False,
                 label_formatter=lambda v, o=offset: f"{(v + o)/1_000_000:.1f} Mb",
                 label_orientation=xticks_orient,
+                **xticks_kwargs,
             )
 
         offset += sector_width
@@ -452,6 +461,7 @@ def plot_circos(
     xticks_orient="vertical",
     xticks_global=True,
     xticks_ruler_width=2,
+    xticks_kwargs=None,
     y_step=1_000,
     same_y_scale=False,
     palette="tab10",
@@ -462,6 +472,7 @@ def plot_circos(
     circos_kwargs=None,
     **kwargs,
 ):
+    xticks_kwargs = dict() if xticks_kwargs is None else xticks_kwargs
 
     contig_lengths = {k: len(v) for k, v in genome.items()}
     full_genome_length = sum(contig_lengths.values())
@@ -540,6 +551,7 @@ def plot_circos(
             color=palette[name],
             log_scale=log_scale,
             track_axis_kwargs=track_axis_kwargs,
+            xticks_kwargs=xticks_kwargs,
         )
 
     if xticks_global:

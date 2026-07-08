@@ -1,3 +1,4 @@
+import gzip
 import os
 import subprocess
 import warnings
@@ -53,6 +54,13 @@ def download_genome(search_term, retmax=100, output_path=None, email=None):
     return data_gb
 
 
+def _open(filename):
+    if str(filename).endswith(".gz"):
+        return gzip.open(filename, "rt")
+    else:
+        return open(filename, "r")
+
+
 def get_genome_file(work_dir, search_term, retmax):
     work_dir = Path(work_dir)
     # Hash the search term to use as filename in cache dir
@@ -65,14 +73,23 @@ def get_genome(genome_file, genome_fasta, search_term=None, retmax=None, email=N
     if search_term is not None:
         genome = download_genome(search_term, retmax, genome_file, email)
     else:
-        if genome_file.suffix == ".gff":
-            genome = SeqIO.to_dict(GFF.parse(genome_file))
-        elif genome_file.suffix == ".gbk":
-            genome = SeqIO.to_dict(SeqIO.parse(genome_file, "genbank"))
-        elif genome_file.suffix in (".fa", ".fasta"):
-            genome = SeqIO.to_dict(SeqIO.parse(genome_file, "fasta"))
+        suffixes = genome_file.suffixes
+        if ".gff" in suffixes:
+            with _open(genome_file) as fh:
+                genome = SeqIO.to_dict(GFF.parse(fh))
+
+        elif ".gbk" in suffixes or ".gbff" in suffixes:
+            with _open(genome_file) as fh:
+                genome = SeqIO.to_dict(SeqIO.parse(fh, "genbank"))
+
+        elif ".fa" in suffixes or ".fasta" in suffixes:
+            with _open(genome_file) as fh:
+                genome = SeqIO.to_dict(SeqIO.parse(genome_file, "fasta"))
+
         else:
-            raise RuntimeError("Wrong format expected either `.gbk` or `.gff` file.")
+            raise RuntimeError(
+                "Wrong format expected either `.fa`, `.gbk`, `.gff` file."
+            )
 
     defined_seqs = [x for x in genome.values() if x.seq.defined]
 
