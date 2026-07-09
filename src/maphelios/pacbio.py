@@ -103,6 +103,8 @@ def _get_read_values(read, tags=None, blast_like_score=False):
     for tag in ("AS", "XS"):
         if read.has_tag(tag):
             read_vals[tag] = read.get_tag(tag)
+        else:
+            read_vals[tag] = None
 
     if blast_like_score:
         read_vals["blast_like_score"] = _blast_identity(read)
@@ -326,6 +328,7 @@ def plot_single_track(
     track_radii,
     r_pad_ratio=0.1,
     y_step=1000,
+    y_num_steps=4,
     y_max=None,
     xticks_by_interval=None,
     xticks_orient="vertical",
@@ -340,7 +343,7 @@ def plot_single_track(
     if y_max is None:
         y_max = get_max_across_contigs(counts_binned)
     if y_step > y_max:
-        new_y_step = max(round(y_max, -2) // 4, 1)
+        new_y_step = max(round(y_max, -2) // y_num_steps, 1)
         warn(
             f"y_step was too large ({y_step} > {y_max}): changed y_step to {new_y_step}"
         )
@@ -463,6 +466,7 @@ def plot_circos(
     xticks_ruler_width=2,
     xticks_kwargs=None,
     y_step=1_000,
+    y_num_steps=4,
     same_y_scale=False,
     palette="tab10",
     legend=False,
@@ -546,6 +550,7 @@ def plot_circos(
             r_pad_ratio=track_r_pad,
             y_step=y_step,
             y_max=y_maxs[name],
+            y_num_steps=y_num_steps,
             xticks_by_interval=xticks_per_track,
             xticks_orient=xticks_orient,
             color=palette[name],
