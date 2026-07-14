@@ -663,8 +663,9 @@ def _draw_seqs(mapping, start, end, ax):
 
 
 def seq_view_plot(
-    contig,
+    genome,
     mapping,
+    contig,
     start,
     end,
     fig=None,
@@ -680,9 +681,9 @@ def seq_view_plot(
         axs = fig.get_axes()
         assert len(axs) == 2, f"Need two axes objects. Got {len(axs)}"
 
-    _draw_seqs(mapping, start, end, axs[0])
+    _draw_seqs(mapping[mapping["query"] == contig], start, end, axs[0])
 
-    rec_genes = _get_graphic_record_genes(contig, start, end)
+    rec_genes = _get_graphic_record_genes(genome[contig], start, end)
     rec_genes.plot(ax=axs[1])
     axs[1].set_xlim(start, end)
     axs[1].set_title("Genes")
@@ -1031,15 +1032,11 @@ def get_strand_count_no_cov(mapping, genome, cov_threshold=0.9):
     )
 
 
-def plot_gene_orient_stacked(
-    data,
-    colour=False,
-    ax=None,
-):
+def plot_gene_orient_stacked(data, ax=None, **kwargs):
     if ax is None:
         fig, ax = plt.subplots()
 
-    data.plot(kind="bar", stacked=True, color=colour, ax=ax)
+    data.plot(kind="bar", stacked=True, **kwargs, ax=ax)
     ax.set_title("Gene orientation of missing genes")
     ax.tick_params(labelrotation=0)
     ax.legend(title="strand")
