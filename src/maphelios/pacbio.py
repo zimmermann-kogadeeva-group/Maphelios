@@ -681,7 +681,7 @@ def seq_view_plot(
         axs = fig.get_axes()
         assert len(axs) == 2, f"Need two axes objects. Got {len(axs)}"
 
-    _draw_seqs(mapping[mapping["query"] == contig], start, end, axs[0])
+    _draw_seqs(mapping[mapping["reference_name"] == contig], start, end, axs[0])
 
     rec_genes = _get_graphic_record_genes(genome[contig], start, end)
     rec_genes.plot(ax=axs[1])
