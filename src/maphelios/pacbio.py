@@ -83,7 +83,9 @@ def _blast_identity(read):
     return matches / aln_len if aln_len else 0.0
 
 
-def _get_read_values(read, tags=None, blast_like_score=False):
+def _get_read_values(read, tags=None, blast_like_score=False, other_cols=None):
+    if other_cols is None:
+        other_cols = []
     attr_names = (
         "reference_name",
         "reference_start",
@@ -97,6 +99,7 @@ def _get_read_values(read, tags=None, blast_like_score=False):
         "flag",
         "is_secondary",
         "is_supplementary",
+        *other_cols,
     )
     read_vals = {attr: getattr(read, attr) for attr in attr_names}
 
