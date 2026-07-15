@@ -148,12 +148,12 @@ def get_aln_df(filename, dropna, drop_non_ccs, add_directions, **kwargs):
 
 @wraps(get_aln_df)
 def get_longread_aln(
-    filename, dropna=True, drop_non_css=True, add_directions=True, **kwargs
+    filename, dropna=True, drop_non_ccs=True, add_directions=True, **kwargs
 ):
     return get_aln_df(
         filename,
         dropna=dropna,
-        drop_non_ccs=drop_non_css,
+        drop_non_ccs=drop_non_ccs,
         add_directions=add_directions,
         **kwargs,
     )
@@ -263,6 +263,25 @@ def bin_all_contigs(
     )
 
 
+def merge_bins(df, start="start", end="end", gap=0, by=None):
+    keys = ([by] if isinstance(by, str) else list(by)) if by else []
+    keys = ["contig", *keys]
+    df = df.sort_values(keys + [start]).reset_index(drop=True)
+
+    prev_end = (df.groupby(keys)[end].cummax() if keys else df[end].cummax()).shift()
+    boundary = df[start] > prev_end + gap
+    if keys:  # force a break at each new group
+        boundary |= df[keys].ne(df[keys].shift()).any(axis=1)
+
+    df["_g"] = boundary.cumsum()
+    return (
+        df.groupby(keys + ["_g"], sort=False)
+        .agg({start: "min", end: "max"})
+        .reset_index(drop=False)
+        .drop(columns="_g")
+    )
+
+
 def get_max_across_contigs(counts_binned):
     return max(x[1].max() for x in counts_binned.values())
 
@@ -320,6 +339,26 @@ def add_global_ticks(
         )
 
 
+def _fix_y_ticks(y_max, y_step, y_num_steps_min=4, y_num_steps_max=20):
+
+    if y_step > y_max:
+        new_y_step = max(round(y_max, -2) // y_num_steps_min, 1)
+        warn(
+            f"y_step was too large ({y_step} > {y_max}): changed y_step to {new_y_step}"
+        )
+        y_step = new_y_step
+
+    y_num_steps = y_max // y_step
+    if y_num_steps > y_num_steps_max:
+        y_step = round(y_max // y_num_steps_max, -2)
+        warn(
+            f"y_step was too small, resulting in too many yticks ({y_num_steps}): "
+            f"changed y_step to {y_step}"
+        )
+    y_ticks = np.arange(0, y_max + y_step, y_step)
+    return y_ticks
+
+
 def plot_single_track(
     circos,
     counts_binned,
@@ -328,7 +367,8 @@ def plot_single_track(
     track_radii,
     r_pad_ratio=0.1,
     y_step=1000,
-    y_num_steps=4,
+    y_num_steps_min=4,
+    y_num_steps_max=20,
     y_max=None,
     xticks_by_interval=None,
     xticks_orient="vertical",
@@ -342,13 +382,8 @@ def plot_single_track(
 
     if y_max is None:
         y_max = get_max_across_contigs(counts_binned)
-    if y_step > y_max:
-        new_y_step = max(round(y_max, -2) // y_num_steps, 1)
-        warn(
-            f"y_step was too large ({y_step} > {y_max}): changed y_step to {new_y_step}"
-        )
-        y_step = new_y_step
-    y_ticks = np.arange(0, y_max + y_step, y_step)
+    y_ticks = _fix_y_ticks(y_max, y_step, y_num_steps_min, y_num_steps_max)
+
     y_labels = list(map(str, y_ticks))
     if log_scale:
         y_labels = [f"$10^{{{int(x)}}}$" for x in y_ticks]
@@ -466,7 +501,8 @@ def plot_circos(
     xticks_ruler_width=2,
     xticks_kwargs=None,
     y_step=1_000,
-    y_num_steps=4,
+    y_num_steps_min=4,
+    y_num_steps_max=20,
     same_y_scale=False,
     palette="tab10",
     legend=False,
@@ -550,7 +586,8 @@ def plot_circos(
             r_pad_ratio=track_r_pad,
             y_step=y_step,
             y_max=y_maxs[name],
-            y_num_steps=y_num_steps,
+            y_num_steps_min=y_num_steps_min,
+            y_num_steps_max=y_num_steps_max,
             xticks_by_interval=xticks_per_track,
             xticks_orient=xticks_orient,
             color=palette[name],
