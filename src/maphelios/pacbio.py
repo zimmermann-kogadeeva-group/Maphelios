@@ -359,7 +359,7 @@ def _fix_y_ticks(y_max, y_step, y_num_steps_min=4, y_num_steps_max=20):
             f"changed y_step to {y_step}"
         )
     y_ticks = np.arange(0, y_max + y_step, y_step)
-    return y_ticks
+    return y_step, y_ticks
 
 
 def plot_single_track(
@@ -385,7 +385,7 @@ def plot_single_track(
 
     if y_max is None:
         y_max = get_max_across_contigs(counts_binned)
-    y_ticks = _fix_y_ticks(y_max, y_step, y_num_steps_min, y_num_steps_max)
+    y_step, y_ticks = _fix_y_ticks(y_max, y_step, y_num_steps_min, y_num_steps_max)
 
     y_labels = list(map(str, y_ticks))
     if log_scale:
