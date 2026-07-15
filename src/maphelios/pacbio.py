@@ -353,7 +353,7 @@ def _fix_y_ticks(y_max, y_step, y_num_steps_min=4, y_num_steps_max=20):
 
     y_num_steps = y_max // y_step
     if y_num_steps > y_num_steps_max:
-        y_step = round(y_max // y_num_steps_max, -2)
+        y_step = max(round(y_max / y_num_steps_max), 1)
         warn(
             f"y_step was too small, resulting in too many yticks ({y_num_steps}): "
             f"changed y_step to {y_step}"
