@@ -742,90 +742,6 @@ def seq_view_plot(
     return fig
 
 
-def get_all_peaks(counts_binned, peak_frac=0.8, distance=5, prominence=0.3, **kwargs):
-    counts_max = max(x[1].max() for x in counts_binned.values())
-
-    info = []
-    for contig_name, (bins_contig, counts_contig) in counts_binned.items():
-        midpoints = (bins_contig[:-1] + bins_contig[1:]) // 2
-        peak_idxs, peak_info = find_peaks(
-            counts_contig,
-            height=peak_frac * counts_max,
-            distance=distance,
-            prominence=prominence,
-        )
-        for idx, midpoint in enumerate(midpoints[peak_idxs]):
-            info.append([contig_name, idx, midpoint])
-    return pd.DataFrame(
-        info,
-        columns=["contig_name", "peak_idx", "midpoint"],
-    ).assign(**kwargs)
-
-
-def subset_mapping_by_peaks(
-    mapping_df, peaks_df, start_buf=4000, end_buf=4000, cols_order=None, **kwargs
-):
-    df_subset = pd.concat(
-        [
-            mapping_df.query(
-                f"reference_end > {row.midpoint - start_buf} and "
-                f"reference_start < {row.midpoint + end_buf} and "
-                f"reference_name == '{row.contig_name}'"
-            ).assign(
-                contig_name=row.contig_name,
-                peak_idx=row.peak_idx,
-                alignment_ANI=lambda x: x.aligned_pairs.apply(read_ani),
-            )
-            for idx, row in peaks_df.iterrows()
-        ],
-        ignore_index=True,
-    )
-
-    if cols_order is None:
-        cols_order = ["contig_name", "peak_idx"]
-
-    return df_subset.pipe(reorder_cols, cols_order)
-
-
-def subset_genes_by_peaks(
-    genome, peaks_df, start_buf=4000, end_buf=4000, cols_order=None, **kwargs
-):
-    df_subset = (
-        pd.concat(
-            [
-                get_genes(
-                    genome[row.contig_name],
-                    row.midpoint - start_buf,
-                    row.midpoint + end_buf,
-                    as_df=True,
-                ).assign(contig_name=row.contig_name, peak_idx=row.peak_idx)
-                for idx, row in peaks_df.iterrows()
-            ],
-            ignore_index=True,
-        )
-        .assign(
-            gene_id=lambda x: x.ID,
-            gene=lambda x: (
-                x.gene.fillna(x["product"]) if "gene" in x.columns else x["product"]
-            ),
-        )
-        .explode(["gene", "gene_id", "ID", "product"])
-    )
-
-    if cols_order is None:
-        cols_order = [
-            "contig_name",
-            "peak_idx",
-            "start",
-            "end",
-            "strand",
-            "type",
-            "gene",
-        ]
-
-    return df_subset.pipe(reorder_cols, cols_order)
-
-
 def get_gene_coverage(ref_start, ref_end, gene_start, gene_end):
     return np.select(
         [
@@ -847,10 +763,9 @@ def get_gene_coverage(ref_start, ref_end, gene_start, gene_end):
     )
 
 
-def quantify_overlap(reads_df, gene_start, gene_end, gene_seq, contig_name, peak_idx):
+def quantify_overlap(reads_df, gene_start, gene_end, gene_seq):
     df_subset = (
-        reads_df.query(f"contig_name == '{contig_name}' and peak_idx == {peak_idx}")
-        .assign(
+        reads_df.assign(
             coverage=lambda x: get_gene_coverage(
                 x.reference_start, x.reference_end, gene_start, gene_end
             ),
@@ -865,50 +780,6 @@ def quantify_overlap(reads_df, gene_start, gene_end, gene_seq, contig_name, peak
     )
 
     return df_subset
-
-
-def get_genes2mappings(df_mapping, df_genes):
-    return pd.concat(
-        [
-            quantify_overlap(
-                df_mapping,
-                row.start,
-                row.end,
-                row.sequence,
-                row.contig_name,
-                row.peak_idx,
-            )
-            .loc[:, ["query_name", "coverage", "gene_ANI"]]
-            .assign(gene_id=row.gene_id, gene=row.gene)
-            for idx, row in df_genes.iterrows()
-        ]
-    )
-
-
-def plot_all_peaks(
-    peaks_df,
-    mapping,
-    genome,
-    output_prefix=None,
-    start_buf=4000,
-    end_buf=4000,
-    peak_frac=0.8,
-    **kwargs,
-):
-    figs = []
-    for idx, row in peaks_df.iterrows():
-        fig = seq_view_plot(
-            genome[row.contig_name],
-            mapping[mapping["reference_name"] == row.contig_name],
-            row.midpoint - start_buf,
-            row.midpoint + end_buf,
-        )
-        if output_prefix is not None:
-            fig.savefig(
-                output_prefix + f"_{row.contig_name}_peak{row.peak_idx}_seq_view.png"
-            )
-        figs.append(fig)
-    return figs
 
 
 def plot_bp_coverage(counts_df, ax=None, log_scale=True, vlines_kwargs=None, **kwargs):
