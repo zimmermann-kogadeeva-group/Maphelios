@@ -20,10 +20,10 @@ upload: build
 	${ACTIVATE} && python3 -m twine upload -r pypi -u __token__ dist/*
 
 check:
-	flake8 src streamlit_app.py
+	flake8 src app
 
 isort:
-	isort src streamlit_app.py
+	isort src app
 
 tags:
 	ctags-universal --recurse -f .tags src
