@@ -1,10 +1,25 @@
 from copy import deepcopy
 
 import numpy as np
+import pandas as pd
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from dna_features_viewer import BiopythonTranslator, GraphicRecord
+from dna_features_viewer import BiopythonTranslator, GraphicFeature, GraphicRecord
 from matplotlib.pyplot import Line2D
+
+
+# Class with label_fields class attribute over-written - needed due to product element
+# being missing
+class BioTranslator(BiopythonTranslator):
+    label_fields = [
+        "label",
+        "name",
+        "gene",
+        "product",
+        "locus_tag",
+        "source",
+        "note",
+    ]
 
 
 def shift_feature(feature, shift=0):
@@ -149,6 +164,81 @@ def get_genes_graphic_record(
     )
 
     return record_hits
+
+
+def get_graphic_record_seq(mapping_df, color="#ebf3ed", xlim=None, cols=None, **kwargs):
+    cols = cols or ["insert_start", "insert_end", "insert_strand", "seq_id"]
+    features = [
+        GraphicFeature(
+            start=start, end=end, strand=strand, color=color, label=query_id, **kwargs
+        )
+        for idx, (start, end, strand, query_id) in mapping_df[cols].iterrows()
+    ]
+
+    start = mapping_df[cols[0]].min()
+    end = mapping_df[cols[1]].max()
+    if xlim is not None:
+        start, end = xlim
+
+    # Plot the query sequence on the upper axes
+    return GraphicRecord(
+        first_index=start,
+        sequence_length=end - start,
+        features=features,
+    )
+
+
+def get_genes(contig, start, end, as_df=False):
+    genes = [shift_feature(gene, start) for gene in contig[start:end].features]
+    if as_df:
+        genes = pd.DataFrame(
+            [
+                {
+                    "start": gene.location.start,
+                    "end": gene.location.end,
+                    "strand": gene.location.strand,
+                    "type": gene.type,
+                    "sequence": str(
+                        contig[gene.location.start : gene.location.end].seq
+                    ),
+                    **gene.qualifiers,
+                }
+                for gene in genes
+            ]
+        )
+    return genes
+
+
+def get_graphic_record_genes(
+    genome,
+    start,
+    end,
+    feature_types=None,
+    color="#ebf3ed",
+    features_properties=None,
+    features_label_idxs=None,
+):
+    genes = get_genes(genome, start, end, as_df=False)
+
+    if feature_types is None:
+        feature_types = {x.type for x in genes}
+
+    conv = BioTranslator(features_properties=features_properties)
+    conv.default_feature_color = color
+    features = [conv.translate_feature(x) for x in genes if x.type in feature_types]
+
+    if features_label_idxs is not None:
+        for idx, feat in enumerate(features):
+            if idx not in features_label_idxs:
+                features[idx].label = None
+
+    # Plot the genes and CDSes in the region of the mapped sequence
+    record_genes = GraphicRecord(
+        first_index=start,
+        sequence_length=end - start,
+        features=features,
+    )
+    return record_genes
 
 
 def fig_axvline(axes, value, ls="--", color="gray", zorder=-100, **kwargs):

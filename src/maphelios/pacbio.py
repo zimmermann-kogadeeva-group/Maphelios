@@ -14,27 +14,11 @@ import pysam
 import seaborn as sns
 from BCBio import GFF
 from Bio import SeqIO
-from dna_features_viewer import BiopythonTranslator, GraphicRecord
 from matplotlib import color_sequences
 from matplotlib.lines import Line2D
 from pycirclize import Circos
-from scipy.signal import find_peaks
 
-from .helper import fig_axvline
-
-
-# Class with label_fields class attribute over-written - needed due to product element
-# being missing
-class BioTranslator(BiopythonTranslator):
-    label_fields = [
-        "label",
-        "name",
-        "gene",
-        "product",
-        "locus_tag",
-        "source",
-        "note",
-    ]
+from .helper import fig_axvline, get_graphic_record_genes
 
 
 def shift_feature(feature, shift=0):
@@ -379,9 +363,11 @@ def plot_single_track(
     log_scale=False,
     track_axis_kwargs=None,
     xticks_kwargs=None,
+    yticks_kwargs=None,
 ):
     track_axis_kwargs = dict() if track_axis_kwargs is None else track_axis_kwargs
     xticks_kwargs = dict() if xticks_kwargs is None else xticks_kwargs
+    yticks_kwargs = dict() if yticks_kwargs is None else yticks_kwargs
 
     if y_max is None:
         y_max = get_max_across_contigs(counts_binned)
@@ -410,7 +396,7 @@ def plot_single_track(
         # unique y-ticks per track, shared between different contigs per track
         # can be different between different tracks
         if i == 0:
-            track.yticks(y_ticks, y_labels, side="left")
+            track.yticks(y_ticks, y_labels, side="left", **yticks_kwargs)
 
         # X ticks
         if xticks_by_interval is not None:
@@ -426,7 +412,6 @@ def plot_single_track(
 
 
 def add_legend(circos, colors, labels, loc="upper right", **kwargs):
-
     # Plot legend
     line_handles = [
         Line2D([], [], color=color, label=label) for color, label in zip(colors, labels)
@@ -492,6 +477,7 @@ def plot_circos(
     genome,
     bin_size=1_000,
     title=None,
+    title_genome_size=True,
     track_sep=None,
     track_r_min=20,
     track_r_max=100,
@@ -503,6 +489,7 @@ def plot_circos(
     xticks_global=True,
     xticks_ruler_width=2,
     xticks_kwargs=None,
+    yticks_kwargs=None,
     y_step=1_000,
     y_num_steps_min=4,
     y_num_steps_max=20,
@@ -513,6 +500,8 @@ def plot_circos(
     log_scale=False,
     order_sectors=None,
     circos_kwargs=None,
+    ax=None,
+    figsize=None,
     **kwargs,
 ):
     xticks_kwargs = dict() if xticks_kwargs is None else xticks_kwargs
@@ -565,12 +554,12 @@ def plot_circos(
     circos = Circos(sectors=contig_lengths, **circos_kwargs)
 
     # Set title
-    fig_title = f"({full_genome_length:,} bp)"
-    title_fontsize = 13
-    if "title_fontsize" in kwargs:
-        title_fontsize = kwargs["title_fontsize"]
+    fig_title = ""
+    title_fontsize = 13 if "title_fontsize" not in kwargs else kwargs["title_fontsize"]
     if title is not None:
-        fig_title = title + "\n" + fig_title
+        fig_title = title
+    if title_genome_size:
+        fig_title += f"({full_genome_length:,} bp)"
     circos.text(fig_title, size=title_fontsize)
 
     # colors
@@ -597,6 +586,7 @@ def plot_circos(
             log_scale=log_scale,
             track_axis_kwargs=track_axis_kwargs,
             xticks_kwargs=xticks_kwargs,
+            yticks_kwargs=yticks_kwargs,
         )
 
     if xticks_global:
@@ -610,9 +600,10 @@ def plot_circos(
             track_r_min - xticks_ruler_width,
             xticks_ruler_width,
             xticks_orient,
+            **xticks_kwargs,
         )
 
-    fig = circos.plotfig()
+    fig = circos.plotfig(ax=ax, figsize=figsize)
     # Legend
     if legend is True:
         if legend_kwargs is None:
@@ -644,46 +635,6 @@ def qc_plots(data):
     return fig
 
 
-def get_genes(contig, start, end, as_df=False):
-    genes = [shift_feature(gene, start) for gene in contig[start:end].features]
-    if as_df:
-        genes = pd.DataFrame(
-            [
-                {
-                    "start": gene.location.start,
-                    "end": gene.location.end,
-                    "strand": gene.location.strand,
-                    "type": gene.type,
-                    "sequence": str(
-                        contig[gene.location.start : gene.location.end].seq
-                    ),
-                    **gene.qualifiers,
-                }
-                for gene in genes
-            ]
-        )
-    return genes
-
-
-def _get_graphic_record_genes(genome, start, end, feature_types=None, col="#ebf3ed"):
-    genes = get_genes(genome, start, end, as_df=False)
-
-    if feature_types is None:
-        feature_types = {x.type for x in genes}
-
-    conv = BioTranslator()
-    conv.default_feature_color = col
-    features = [conv.translate_feature(x) for x in genes if x.type in feature_types]
-
-    # Plot the genes and CDSes in the region of the mapped sequence
-    record_genes = GraphicRecord(
-        first_index=start,
-        sequence_length=end - start,
-        features=features,
-    )
-    return record_genes
-
-
 def _draw_seqs(mapping, start, end, ax):
     df_subset = mapping.query(
         f"reference_start < {end} and reference_end > {start}"
@@ -708,27 +659,25 @@ def seq_view_plot(
     contig,
     start,
     end,
-    fig=None,
+    axs=None,
     figsize=None,
-    fig_title=None,
     axvlines=None,
     axvlines_kwargs=None,
+    genes_kwargs=None,
 ):
-    if fig is None:
+    if axs is None:
         figsize = (10, 7) if figsize is None else figsize
         fig, axs = plt.subplots(2, 1, figsize=figsize, sharex=True)
     else:
-        axs = fig.get_axes()
         assert len(axs) == 2, f"Need two axes objects. Got {len(axs)}"
 
     _draw_seqs(mapping[mapping["reference_name"] == contig], start, end, axs[0])
 
-    rec_genes = _get_graphic_record_genes(genome[contig], start, end)
+    genes_kwargs = {} if genes_kwargs is None else genes_kwargs
+    rec_genes = get_graphic_record_genes(genome[contig], start, end, **genes_kwargs)
     rec_genes.plot(ax=axs[1])
     axs[1].set_xlim(start, end)
     axs[1].set_title("Genes")
-    if fig_title is not None:
-        fig.suptitle(fig_title)
 
     if axvlines is not None:
         axvlines_kwargs = {} if axvlines_kwargs is None else axvlines_kwargs
@@ -739,7 +688,7 @@ def seq_view_plot(
         else:
             for value in axvlines:
                 fig_axvline(axs, value, **axvlines_kwargs)
-    return fig
+    return axs
 
 
 def get_gene_coverage(ref_start, ref_end, gene_start, gene_end):
