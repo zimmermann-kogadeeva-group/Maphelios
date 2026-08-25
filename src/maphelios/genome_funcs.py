@@ -2,11 +2,21 @@ import gzip
 import os
 import subprocess
 import warnings
+from copy import deepcopy
+from functools import lru_cache
 from hashlib import sha1
 from pathlib import Path
 
+import pandas as pd
 from BCBio import GFF
 from Bio import Entrez, SearchIO, SeqIO
+
+
+def shift_feature(feature, shift=0):
+    """Helper function to shift a Biopython feature without changing the original"""
+    new_feature = deepcopy(feature)
+    new_feature.location = feature.location + shift
+    return new_feature
 
 
 def _download_genome(search_term, retmax=100, email=None):
@@ -114,6 +124,13 @@ def _correct_hit_id(x):
     return x
 
 
+@lru_cache(maxsize=1024)
+def get_contig_lengths(genome_path):
+    with _open(genome_path) as fh:
+        genome = SeqIO.to_dict(GFF.parse(fh))
+    return {k: len(v) for k, v in genome.items()}
+
+
 def run_blast(seq_file, db_file, blast_output, blast_options=None):
     # TODO: check how to catch errors from blast
     # make blast database
@@ -153,3 +170,43 @@ def run_blast(seq_file, db_file, blast_output, blast_options=None):
 
 def run_minimap2(seq_file, db_file, output_file):
     pass
+
+
+def get_genes(contig, start, end, as_df=False):
+    genes = [shift_feature(gene, start) for gene in contig[start:end].features]
+    if as_df:
+        genes = pd.DataFrame(
+            [
+                {
+                    "start": gene.location.start,
+                    "end": gene.location.end,
+                    "strand": gene.location.strand,
+                    "type": gene.type,
+                    "sequence": str(
+                        contig[gene.location.start : gene.location.end].seq
+                    ),
+                    **gene.qualifiers,
+                }
+                for gene in genes
+            ]
+        )
+    return genes
+
+
+def get_gene_coverage(gene_start, gene_end, region_start, region_end):
+    if gene_start >= region_start and gene_end <= region_end:
+        return 1.0
+    elif gene_end < region_start or gene_start > region_end:
+        return 0.0
+    elif gene_start < region_start and gene_end > region_end:  # TODO: check this
+        return (region_end - region_start + 1) / (gene_end - gene_start + 1)
+    elif gene_start < region_start and region_start <= gene_end <= region_end:
+        return (gene_end - region_start + 1) / (gene_end - gene_start + 1)
+    elif gene_end > region_end and region_start <= gene_start <= region_end:
+        return (region_end - gene_start + 1) / (gene_end - gene_start + 1)
+    else:
+        raise RuntimeError(
+            f"Unknown gene case: "
+            f"{gene_start=}, {gene_end=}, "
+            f"insert_start={region_start}, insert_end={region_end}"
+        )
