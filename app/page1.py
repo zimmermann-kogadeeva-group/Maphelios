@@ -1,3 +1,4 @@
+from gzip import decompress
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -6,6 +7,8 @@ import streamlit as st
 from Bio import SeqIO
 
 from maphelios import Mapping
+from maphelios import pacbio as pb
+from maphelios.genome_funcs import get_genome, run_minimap2
 from maphelios.helper import quality_filter
 
 INPUT_FORMATS = {
@@ -35,6 +38,9 @@ class TempDirManager:
 
 
 def get_main_inputs(workdir=False):
+
+    seq_type = st.radio("Sequencing type:", ("Sanger", "Longread"))
+    st.session_state.seq_type = seq_type
 
     # Radio buttons to switch between text input and file upload
     genome_src = st.radio("Genome:", ("NCBI", "File"))
@@ -68,7 +74,7 @@ def get_main_inputs(workdir=False):
 
     seq_fh = st.file_uploader(
         "Sequence file:",
-        type=["fasta", "fas", "fna", "ab1", "fastq"],
+        type=["fasta", "fas", "fna", "ab1", "fastq", "fastq.gz"],
         key="seqs",
         accept_multiple_files=True,
     )
@@ -95,34 +101,37 @@ def get_main_inputs(workdir=False):
 
     fwd_suf, rev_suf = None, None
     default_ins_len = 4000
-    if st.toggle("Pair forward and reverse sequences"):
-        fwd_suf = st.text_input("Forward suffix:", "_F", key="fwd_suf")
-        rev_suf = st.text_input("Reverse suffix:", "_R", key="rev_suf")
-        default_ins_len = st.number_input(
-            "Default insert length:",
-            value=default_ins_len,
-            min_value=0,
-            help=(
-                "When a forward or reverse sequence cannot be "
-                "paired with a corresponding sequence, then this "
-                "number will be used as length of the insert"
-            ),
-        )
-
     blast_options = None
-    with st.expander("Additional BLAST settings"):
-        blast_evalue = st.number_input("E-value", value=10.0, format="%0.3f")
-        blast_wordsize = st.number_input("Word size", value=None, min_value=4)
 
-        blast_options = f"-evalue {blast_evalue}"
-        if blast_wordsize is not None:
-            blast_options += f" -word_size {blast_wordsize}"
+    if seq_type == "Sanger":
+        if st.toggle("Pair forward and reverse sequences"):
+            fwd_suf = st.text_input("Forward suffix:", "_F", key="fwd_suf")
+            rev_suf = st.text_input("Reverse suffix:", "_R", key="rev_suf")
+            default_ins_len = st.number_input(
+                "Default insert length:",
+                value=default_ins_len,
+                min_value=0,
+                help=(
+                    "When a forward or reverse sequence cannot be "
+                    "paired with a corresponding sequence, then this "
+                    "number will be used as length of the insert"
+                ),
+            )
+
+        with st.expander("Additional BLAST settings"):
+            blast_evalue = st.number_input("E-value", value=10.0, format="%0.3f")
+            blast_wordsize = st.number_input("Word size", value=None, min_value=4)
+
+            blast_options = f"-evalue {blast_evalue}"
+            if blast_wordsize is not None:
+                blast_options += f" -word_size {blast_wordsize}"
 
     workdir_path = None
     if workdir:
         workdir_path = st.text_input("workdir", "Output")
 
     most_inputs = {
+        "seq_type": seq_type,
         "seq_fh": seq_fh,
         "retmax": retmax,
         "fwd_suf": fwd_suf,
@@ -151,6 +160,7 @@ def get_main_inputs(workdir=False):
 
 @st.cache_data
 def run_pipeline(
+    seq_type,
     seq_fh,
     genome_fh,
     search_term,
@@ -172,13 +182,20 @@ def run_pipeline(
         else:
             genome_path = None
 
-        seq_path = str(dirpath / "seqs.fasta")
+        output_type = "fasta" if seq_type == "Sanger" else "fastq"
+        seq_path = str(dirpath / f"seqs.{output_type}")
         with open(seq_path, "w") as fh:
             for seq in seq_fh:
-                input_format = INPUT_FORMATS[seq.name.rsplit(".")[-1]]
 
+                input_format = INPUT_FORMATS[
+                    seq.name.removesuffix(".gz").rsplit(".")[-1]
+                ]
+                gzipped = seq.name.endswith(".gz")
                 if input_format != "abi":
-                    seq = StringIO(seq.getvalue().decode("utf-8"))
+                    seq = seq.getvalue()
+                    if gzipped:
+                        seq = decompress(seq)
+                    seq = StringIO(seq.decode("utf-8"))
 
                 for rec in SeqIO.parse(seq, input_format):
                     processed_rec = quality_filter(
@@ -187,20 +204,31 @@ def run_pipeline(
                         threshold=qc_value,
                         fix_id=True,
                     )
-                    SeqIO.write(processed_rec, fh, "fasta")
+                    SeqIO.write(processed_rec, fh, output_type)
 
         try:
-            res = Mapping(
-                seq_file=seq_path,
-                work_dir=dirpath,
-                genome_file=genome_path,
-                search_term=search_term,
-                retmax=retmax,
-                fwd_suffix=fwd_suf,
-                rev_suffix=rev_suf,
-                avg_insert_len=avg_insert_len,
-                blast_options=blast_options,
-            )
+            if seq_type == "Sanger":
+                res = Mapping(
+                    seq_file=seq_path,
+                    work_dir=dirpath,
+                    genome_file=genome_path,
+                    search_term=search_term,
+                    retmax=retmax,
+                    fwd_suffix=fwd_suf,
+                    rev_suffix=rev_suf,
+                    avg_insert_len=avg_insert_len,
+                    blast_options=blast_options,
+                )
+            elif seq_type == "Longread":
+                run_minimap2(seq_path, genome_path, dirpath / "aln.sam")
+                aln = pb.get_longread_aln(
+                    dirpath / "aln.sam", dropna=True, blast_like_score=True
+                )
+
+                genome = get_genome(genome_path, search_term=search_term, retmax=retmax)
+
+                res = {"mapping": aln, "genome": genome}
+
         except RuntimeError as e:
             st.error(e)
             return None

@@ -113,7 +113,7 @@ def get_table_query(seq_ids, clusters):
     return query
 
 
-def show_results():
+def sanger_results():
 
     if st.session_state.results is not None:
         all_results = mh.Comparison(st.session_state.results)

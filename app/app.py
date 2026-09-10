@@ -3,7 +3,8 @@ import argparse
 
 import streamlit as st
 from page1 import get_main_inputs, run_pipeline
-from page2 import show_results
+from page2_longread import longread_results
+from page2_sanger import sanger_results
 
 from maphelios import __version__
 
@@ -37,12 +38,13 @@ def main():
 
     if st.session_state.stage == 0:
         all_inputs = get_main_inputs(args.workdir)
-        st.button(
-            "Submit", on_click=submit, args=[all_inputs], use_container_width=True
-        )
+        st.button("Submit", on_click=submit, args=[all_inputs], width="stretch")
 
     if st.session_state.stage >= 1:
-        show_results()
+        if st.session_state.seq_type == "Sanger":
+            sanger_results()
+        elif st.session_state.seq_type == "Longread":
+            longread_results()
 
 
 if __name__ == "__main__":

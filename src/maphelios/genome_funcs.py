@@ -68,7 +68,11 @@ def get_genome_file(work_dir, search_term, retmax):
     return work_dir / f"db_{search_hashed}.gbk"
 
 
-def get_genome(genome_file, genome_fasta, search_term=None, retmax=None, email=None):
+def get_genome(
+    genome_file, genome_fasta=None, search_term=None, retmax=None, email=None
+):
+    if genome_file is not None:
+        genome_file = Path(genome_file)
     # Get genome
     if search_term is not None:
         genome = download_genome(search_term, retmax, genome_file, email)
@@ -102,7 +106,8 @@ def get_genome(genome_file, genome_fasta, search_term=None, retmax=None, email=N
         raise RuntimeError(message)
 
     # Save in fasta format (only acceptable format for makeblastdb)
-    SeqIO.write(defined_seqs, genome_fasta, "fasta")
+    if genome_fasta is not None:
+        SeqIO.write(defined_seqs, genome_fasta, "fasta")
 
     return genome
 
@@ -151,5 +156,15 @@ def run_blast(seq_file, db_file, blast_output, blast_options=None):
     }
 
 
-def run_minimap2(seq_file, db_file, output_file):
-    pass
+def run_minimap2(reads, genome_file, output_file):
+    # align input sequences with genome using minimap2 with default options
+
+    run = subprocess.run(
+        f"minimap2 -ax map-hifi -t 4 {genome_file} {reads} > {output_file}",
+        shell=True,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if run.returncode != 0:
+        raise OSError(f"Failed to run minimap2: {run.stderr.decode()}")

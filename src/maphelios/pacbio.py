@@ -79,7 +79,6 @@ def _get_read_values(read, tags=None, blast_like_score=False, other_cols=None):
         "query_alignment_start",
         "query_alignment_end",
         "mapping_quality",
-        "query_sequence",
         "flag",
         "is_secondary",
         "is_supplementary",

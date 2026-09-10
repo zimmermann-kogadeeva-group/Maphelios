@@ -176,6 +176,7 @@ class Mapping(object):
         # Populate obj attributes
         self.max_insert_len = max_insert_len
         self.avg_insert_len = avg_insert_len
+
         # If fwd and rev suffixes are None, then inserts are not paired
         self.fwd_suf = fwd_suffix
         self.rev_suf = rev_suffix

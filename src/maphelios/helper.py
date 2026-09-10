@@ -24,6 +24,8 @@ class BioTranslator(BiopythonTranslator):
 
 def shift_feature(feature, shift=0):
     """Helper function to shift a Biopython feature without changing the original"""
+    if shift is None:
+        shift = 0
     new_feature = deepcopy(feature)
     new_feature.location = feature.location + shift
     return new_feature
@@ -188,8 +190,8 @@ def get_graphic_record_seq(mapping_df, color="#ebf3ed", xlim=None, cols=None, **
     )
 
 
-def get_genes(contig, start, end, as_df=False):
-    genes = [shift_feature(gene, start) for gene in contig[start:end].features]
+def get_genes(contig, start=None, end=None, as_df=False):
+    genes = [shift_feature(gene, start) for gene in contig[slice(start, end)].features]
     if as_df:
         genes = pd.DataFrame(
             [
