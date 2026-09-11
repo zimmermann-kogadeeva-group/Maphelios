@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     zip
 
-RUN curl https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.16.0/ncbi-blast-2.16.0+-x64-linux.tar.gz -o blast.tar.gz | tar -C /opt/ -zxvf - 
+RUN curl -L https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.16.0/ncbi-blast-2.16.0+-x64-linux.tar.gz | tar -C /opt/ -zxvf - 
 
 RUN curl -L https://github.com/lh3/minimap2/releases/download/v2.31/minimap2-2.31_x64-linux.tar.bz2 | tar -C /opt/ -jxvf -
 
