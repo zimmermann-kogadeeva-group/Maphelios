@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
-import maphelios as mh
 from maphelios import pacbio as pb
 from maphelios.helper import get_genes
 
@@ -18,6 +17,15 @@ def strip_ext(name):
         if name.endswith(ext):
             return name.removesuffix(ext)
     return name
+
+
+def filter_reads(mapping, supplementary=False, secondary=False):
+    new_mapping = mapping.copy()
+    if supplementary:
+        new_mapping = new_mapping[new_mapping["is_supplementary"] == False]
+    if secondary:
+        new_mapping = new_mapping[new_mapping["is_secondary"] == False]
+    return new_mapping
 
 
 @st.cache_data
@@ -103,12 +111,14 @@ def qc_plots(mapping, genome):
     return fig
 
 
-def plot_genomes(results):
+def plot_genomes(results, supplementary=False, secondary=False):
     # TODO: plotting options
     with st.expander("Plotting options"):
         circos_opts = dict(
             bin_size=st.number_input("Bin size:", 1, 100000, 5000),
-            legend=False,
+            track_sep=st.selectbox(
+                "Track separator", ["insert_ori", "strand"], index=None
+            ),
             track_r_min=st.slider("Track inner radius:", 10, 50, 40),
             track_r_max=st.slider("Track outer radius:", 50, 100, 90),
             track_axis_kwargs=dict(ec="black", alpha=0.5),
@@ -119,6 +129,7 @@ def plot_genomes(results):
                 start=st.slider("Track start angle:", 0, 180, 0),
                 end=st.slider("Track end angle:", 180, 360, 340),
             ),
+            legend=st.toggle("Legend", False),
             title_genome_size=False,
         )
 
@@ -130,7 +141,10 @@ def plot_genomes(results):
 
         fig, ax = plt.subplots(subplot_kw=dict(polar=True))
         ax.set_title(strip_ext(genome_label))
-        _, circos = pb.plot_circos(**res, ax=ax, **circos_opts)
+
+        df_aln = res["mapping"].pipe(filter_reads, supplementary, secondary)
+
+        _, circos = pb.plot_circos(df_aln, res["genome"], ax=ax, **circos_opts)
 
         # Save the svg figure in a buffer
         img_buffer = BytesIO()
@@ -143,7 +157,7 @@ def plot_genomes(results):
         plt.close()
 
         with st.expander("QC plots"):
-            fig = qc_plots(**res)
+            fig = qc_plots(df_aln, res["genome"])
             st.pyplot(fig)
             plt.close()
 
@@ -162,7 +176,7 @@ def plot_genomes(results):
     )
 
 
-def plot_reads(results):
+def plot_reads(results, supplementary=False, secondary=False):
 
     # To store the buffers that will hold the images
     svg_buffers = dict()
@@ -195,9 +209,15 @@ def plot_reads(results):
                 key="bp_width_" + genome_label,
             )
 
+        df_aln = res["mapping"].pipe(filter_reads, supplementary, secondary)
         fig, axes = plt.subplots(2, 1)
         _ = pb.seq_view_plot(
-            **res, contig=contig_choice, start=start, end=start + width, axs=axes
+            res["genome"],
+            df_aln,
+            contig=contig_choice,
+            start=start,
+            end=start + width,
+            axs=axes,
         )
 
         # Save the svg figure in a buffer
@@ -210,9 +230,12 @@ def plot_reads(results):
         st.pyplot(fig)
         plt.close()
 
-        df_genes = get_genes(
-            res["genome"][contig_choice], start, start + width, as_df=True
-        ).drop(columns=["sequence"])
+        cols_order = ["label", "name", "gene", "product", "locus_tag", "source", "note"]
+        df_genes = (
+            get_genes(res["genome"][contig_choice], start, start + width, as_df=True)
+            .drop(columns=["sequence"])
+            .pipe(pb.reorder_cols, cols_order)
+        )
         with st.expander("Table of genes"):
             st.write(df_genes)
 
@@ -248,16 +271,24 @@ def longread_results():
 
         if len(chosen_res):
 
-            df_inserts = pd.concat(
-                [res["mapping"].assign(genome=k) for k, res in chosen_res.items()],
-                ignore_index=True,
-            )
-
             with genome_view:
                 st.header("Genome view")
 
                 # ==== Mapping information section ====
                 st.subheader("Mapping information (reads to refs)", divider="green")
+
+                filters = dict(
+                    supplementary=st.toggle("Filter supplementary reads", False),
+                    secondary=st.toggle("Filter secondary reads", False),
+                )
+
+                df_inserts = pd.concat(
+                    [
+                        res["mapping"].assign(genome=k).pipe(filter_reads, **filters)
+                        for k, res in chosen_res.items()
+                    ],
+                    ignore_index=True,
+                )
 
                 with st.expander("Table of all mapped seqs"):
                     st.write(df_inserts)
@@ -269,16 +300,30 @@ def longread_results():
                         mime="text/csv",
                         use_container_width=True,
                     )
+                with st.expander("Number of supplementary and secondary alignments"):
+                    st.write(
+                        df_inserts.groupby("genome")
+                        .agg(
+                            num_suppl=pd.NamedAgg("is_supplementary", "sum"),
+                            num_sec=pd.NamedAgg("is_secondary", "sum"),
+                        )
+                        .rename(
+                            columns={
+                                "num_suppl": "Number of supplementary",
+                                "num_sec": "Number of secondary",
+                            }
+                        )
+                    )
 
                 # ====  Plot sequences on genomes section ====
                 st.subheader("Plot reads to refs", divider="green")
 
-                plot_genomes(chosen_res)
+                plot_genomes(chosen_res, **filters)
 
             with insert_view:
                 st.header("Reads view")
 
                 # ==== Plotting section ====
-                st.subheader("Plot sequence or cluster of sequences", divider="green")
+                st.subheader("Plot reads to genes", divider="green")
 
-                plot_reads(chosen_res)
+                plot_reads(chosen_res, **filters)
