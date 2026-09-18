@@ -39,6 +39,13 @@ def sidebar_opts():
         st.session_state.search_term_count = 1
         st.rerun()
 
+    tabbed = st.sidebar.toggle("Tabbed interface", True)
+    if tabbed:
+        genome_view, insert_view = st.tabs(["Genome view", "Insert view"])
+    else:
+        genome_view, insert_view = st.columns(2)
+    return genome_view, insert_view
+
 
 def select_genomes(all_results):
     st.sidebar.write("Genomes:")
@@ -257,15 +264,9 @@ def plot_reads(results, supplementary=False, secondary=False):
 def longread_results():
 
     if st.session_state.results is not None:
+        genome_view, insert_view = sidebar_opts()
+
         all_results = st.session_state.results
-
-        sidebar_opts()
-
-        tabbed = st.sidebar.toggle("Tabbed interface", True)
-        if tabbed:
-            genome_view, insert_view = st.tabs(["Genome view", "Insert view"])
-        else:
-            genome_view, insert_view = st.columns(2)
 
         chosen_res = select_genomes(all_results)
 

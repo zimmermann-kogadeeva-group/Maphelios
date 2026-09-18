@@ -1,3 +1,4 @@
+import os
 from gzip import decompress
 from io import StringIO
 from pathlib import Path
@@ -19,6 +20,83 @@ INPUT_FORMATS = {
     "fastq": "fastq",
 }
 
+# Bundled example dataset. The sequences are shipped with the app, while the
+# genome is pulled from NCBI through the usual Entrez path, so that we do not
+# have to vendor a multi-megabyte genome file.
+EXAMPLE_DIR = Path(__file__).parent
+
+EXAMPLE = {
+    "label": "B. uniformis ATCC 8492 - Xgal functional screen",
+    "seq_files": ["buni_func_screen_xgal.fasta"],
+    "search_term": "Bacteroides uniformis ATCC 8492",
+    "retmax": 10,
+    "fwd_suf": "-49_F",
+    "rev_suf": "-348_R",
+}
+
+
+class ExampleFile:
+    """Stand-in for st.UploadedFile.
+
+    The pipeline only ever needs the file name (to pick a parser) and the raw
+    bytes, so those are the only two things reproduced here.
+    """
+
+    def __init__(self, path):
+        path = Path(path)
+        self.name = path.name
+        self._data = path.read_bytes()
+
+    def getvalue(self):
+        return self._data
+
+
+def example_seq_paths():
+    return [EXAMPLE_DIR / name for name in EXAMPLE["seq_files"]]
+
+
+def example_available():
+    return all(path.is_file() for path in example_seq_paths())
+
+
+def load_example():
+    st.session_state.example_loaded = True
+    st.session_state.seq_type_input = "Sanger"
+    st.session_state.genome_src = "NCBI"
+    st.session_state.pair_seqs = True
+    st.session_state.search_term = EXAMPLE["search_term"]
+    st.session_state.retmax = EXAMPLE["retmax"]
+    st.session_state.fwd_suf = EXAMPLE["fwd_suf"]
+    st.session_state.rev_suf = EXAMPLE["rev_suf"]
+
+
+def clear_example():
+    st.session_state.example_loaded = False
+    st.session_state.search_term = ""
+    st.session_state.retmax = 200
+    st.session_state.pair_seqs = False
+
+
+def example_controls():
+    """Button to fill the form with the bundled example dataset."""
+
+    if st.session_state.get("example_loaded"):
+        st.button("Clear example data", on_click=clear_example)
+        return
+
+    available = example_available()
+    missing = ", ".join(x.name for x in example_seq_paths() if not x.is_file())
+    st.button(
+        "Load example data",
+        on_click=load_example,
+        disabled=not available,
+        help=(
+            f"Fill in the form with {EXAMPLE['label']}"
+            if available
+            else f"Example data is not installed (missing: {missing})"
+        ),
+    )
+
 
 class TempDirManager:
     def __init__(self, dirpath=None):
@@ -39,11 +117,15 @@ class TempDirManager:
 
 def get_main_inputs(workdir=False):
 
-    seq_type = st.radio("Sequencing type:", ("Sanger", "Longread"))
+    example_controls()
+
+    seq_type = st.radio(
+        "Sequencing type:", ("Sanger", "Longread"), key="seq_type_input"
+    )
     st.session_state.seq_type = seq_type
 
     # Radio buttons to switch between text input and file upload
-    genome_src = st.radio("Genome:", ("NCBI", "File"))
+    genome_src = st.radio("Genome:", ("NCBI", "File"), key="genome_src")
 
     # Text inputs
     genome_fh = None
@@ -79,6 +161,12 @@ def get_main_inputs(workdir=False):
         accept_multiple_files=True,
     )
 
+    # The file uploader cannot be filled in programmatically, so the example
+    # sequences are slotted in here instead. Anything the user uploads wins.
+    if st.session_state.get("example_loaded") and not seq_fh:
+        seq_fh = [ExampleFile(path) for path in example_seq_paths()]
+        st.info(f"Example data loaded ({EXAMPLE['label']}) - press Submit to run.")
+
     # Add QC parameters in case ab1 files are submitted
     qc_value, qc_ws = None, None
     if any([seq.name.endswith((".ab1", ".fastq")) for seq in seq_fh]):
@@ -104,7 +192,7 @@ def get_main_inputs(workdir=False):
     blast_options = None
 
     if seq_type == "Sanger":
-        if st.toggle("Pair forward and reverse sequences"):
+        if st.toggle("Pair forward and reverse sequences", key="pair_seqs"):
             fwd_suf = st.text_input("Forward suffix:", "_F", key="fwd_suf")
             rev_suf = st.text_input("Reverse suffix:", "_R", key="rev_suf")
             default_ins_len = st.number_input(
@@ -158,7 +246,7 @@ def get_main_inputs(workdir=False):
     return all_inputs
 
 
-@st.cache_data
+@st.cache_data(hash_funcs={ExampleFile: lambda f: (f.name, f.getvalue())})
 def run_pipeline(
     seq_type,
     seq_fh,

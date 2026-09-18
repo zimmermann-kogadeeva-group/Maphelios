@@ -14,7 +14,23 @@ def sidebar_opts():
     if st.sidebar.button("Reset", use_container_width=True):
         st.session_state.stage = 0
         st.session_state.search_term_count = 1
+
+        st.session_state.example_loaded = False
+        st.session_state.search_term = ""
+        st.session_state.retmax = 200
+        st.session_state.pair_seqs = False
+
         st.rerun()
+
+    tabbed = st.sidebar.toggle("Tabbed interface", True)
+    if tabbed:
+        genome_view, insert_view = st.tabs(["Genome view", "Insert view"])
+    else:
+        genome_view, insert_view = st.columns(2)
+    return genome_view, insert_view
+
+
+def sidebar_params():
 
     insert_type = st.sidebar.selectbox(
         "Insert type:",
@@ -116,15 +132,10 @@ def get_table_query(seq_ids, clusters):
 def sanger_results():
 
     if st.session_state.results is not None:
+        genome_view, insert_view = sidebar_opts()
+        params = sidebar_params()
+
         all_results = mh.Comparison(st.session_state.results)
-
-        params = sidebar_opts()
-
-        tabbed = st.sidebar.toggle("Tabbed interface", True)
-        if tabbed:
-            genome_view, insert_view = st.tabs(["Genome view", "Insert view"])
-        else:
-            genome_view, insert_view = st.columns(2)
 
         res_choice = select_genomes(all_results.keys())
         res_choice_all_seqs = {x: None for x in res_choice}
