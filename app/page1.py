@@ -169,7 +169,7 @@ def get_main_inputs(workdir=False):
 
     # Add QC parameters in case ab1 files are submitted
     qc_value, qc_ws = None, None
-    if any([seq.name.endswith((".ab1", ".fastq")) for seq in seq_fh]):
+    if any([seq.name.endswith((".ab1", ".fastq", "fastq.gz")) for seq in seq_fh]):
         qc_value = st.number_input(
             "Quality filtering - threshold",
             value=None,

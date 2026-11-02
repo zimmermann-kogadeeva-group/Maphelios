@@ -156,11 +156,25 @@ def run_blast(seq_file, db_file, blast_output, blast_options=None):
     }
 
 
-def run_minimap2(reads, genome_file, output_file):
+def run_minimap2(reads, genome_file, output_file, parallel=4):
     # align input sequences with genome using minimap2 with default options
 
     run = subprocess.run(
-        f"minimap2 -ax map-hifi -t 4 {genome_file} {reads} > {output_file}",
+        f"minimap2 -ax map-hifi -t {parallel} {genome_file} {reads} > {output_file}",
+        shell=True,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if run.returncode != 0:
+        raise OSError(f"Failed to run minimap2: {run.stderr.decode()}")
+
+
+def run_bowtie2(reads, genome_file, output_file, parallel=4, seed=42):
+    # align input sequences with genome using minimap2 with default options
+
+    run = subprocess.run(
+        f"bowtie2 --threads {parallel} --seed {seed} -a -x {genome_file} -U {reads} -S {output_file}",
         shell=True,
         check=True,
         stdout=subprocess.PIPE,
