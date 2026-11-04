@@ -1,6 +1,7 @@
 import gzip
 import os
 import subprocess
+import tempfile
 import warnings
 from hashlib import sha1
 from pathlib import Path
@@ -170,15 +171,97 @@ def run_minimap2(reads, genome_file, output_file, parallel=4):
         raise OSError(f"Failed to run minimap2: {run.stderr.decode()}")
 
 
-def run_bowtie2(reads, genome_file, output_file, parallel=4, seed=42):
-    # align input sequences with genome using minimap2 with default options
+def run_cutadapt(input_file, output_file, parallel=4, **kwargs):
+    cutadapt_opts = {
+        "overlap": 32,
+        "error-rate": 0.2,
+        "discard-untrimmed": True,
+        "minimum-length": 20,
+    }
+    cutadapt_opts.update(kwargs)
+
+    if "front" not in cutadapt_opts and "adapter" not in cutadapt_opts:
+        raise ValueError("either `front` or `adapter` must be given for cutadapt")
+
+    cutadapt_opts = " ".join(
+        [f"--{k} {v}" if v is not True else f"--{k}" for k, v in cutadapt_opts.items()]
+    )
+
+    output_file = Path(output_file)
+    output_file.parent.mkdir(exist_ok=True, parents=True)
 
     run = subprocess.run(
-        f"bowtie2 --threads {parallel} --seed {seed} -a -x {genome_file} -U {reads} -S {output_file}",
+        f"cutadapt --cores {parallel} {cutadapt_opts} -o {output_file} {input_file}",
         shell=True,
         check=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
     if run.returncode != 0:
-        raise OSError(f"Failed to run minimap2: {run.stderr.decode()}")
+        raise OSError(f"Failed to run cutadapt: {run.stderr.decode()}")
+
+
+def run_fastp(input_file, output_file, parallel=4, **kwargs):
+    fastp_opts = {"cut_tail": True, "cut_window_size": 3, "cut_mean_quality": 20}
+    fastp_opts.update(**kwargs)
+
+    fastp_opts = " ".join(
+        [f"--{k} {v}" if v is not True else f"--{k}" for k, v in fastp_opts.items()]
+    )
+
+    output_file = Path(output_file)
+    output_file.parent.mkdir(exist_ok=True, parents=True)
+
+    run = subprocess.run(
+        f"fastp -i {input_file} -o {output_file} --thread {parallel} {fastp_opts}",
+        shell=True,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if run.returncode != 0:
+        raise OSError(f"Failed to run fastp: {run.stderr.decode()}")
+
+
+def run_bowtie2(reads, genome_file, output_file, parallel=4, seed=42):
+    with tempfile.TemporaryDirectory() as tmpdir:
+
+        genome_file = Path(genome_file)
+        genome_idx = Path(tmpdir) / genome_file.with_suffix(".indexed.fa").name
+        # align input sequences with genome using minimap2 with default options
+        run1 = subprocess.run(
+            f"bowtie2-build --threads {parallel} {genome_file} {genome_idx}",
+            shell=True,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if run1.returncode != 0:
+            raise OSError(f"Failed to run minimap2: {run1.stderr.decode()}")
+
+        run2 = subprocess.run(
+            f"bowtie2 --threads {parallel} --seed {seed} -a -x {genome_idx} -U {reads} -S {output_file}",
+            shell=True,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if run2.returncode != 0:
+            raise OSError(f"Failed to run minimap2: {run2.stderr.decode()}")
+
+
+def run_tnseq_aln(
+    reads, genome, output_file, parallel=4, cutadapt_kwargs=None, fastp_kwargs=None
+):
+    if cutadapt_kwargs is None:
+        cutadapt_kwargs = dict()
+    if fastp_kwargs is None:
+        fastp_kwargs = dict()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir = Path(tmpdir)
+        cutadapt_output = tmpdir / "cutadapt_output.fastq"
+        fastp_output = tmpdir / "fastp_output.fastq"
+        run_cutadapt(reads, cutadapt_output, **cutadapt_kwargs)
+        run_fastp(cutadapt_output, fastp_output, **fastp_kwargs)
+        run_bowtie2(fastp_output, genome, output_file)
