@@ -208,6 +208,8 @@ def get_genes(contig, start=None, end=None, as_df=False):
                 for gene in genes
             ]
         )
+        if len(genes) == 0:
+            genes = pd.DataFrame(columns=["start", "end", "strand", "type", "sequence"])
     return genes
 
 

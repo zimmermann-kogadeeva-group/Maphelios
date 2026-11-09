@@ -159,7 +159,6 @@ def run_blast(seq_file, db_file, blast_output, blast_options=None):
 
 def run_minimap2(reads, genome_file, output_file, parallel=4):
     # align input sequences with genome using minimap2 with default options
-
     run = subprocess.run(
         f"minimap2 -ax map-hifi -t {parallel} {genome_file} {reads} > {output_file}",
         shell=True,
@@ -182,6 +181,15 @@ def run_cutadapt(input_file, output_file, parallel=4, **kwargs):
 
     if "front" not in cutadapt_opts and "adapter" not in cutadapt_opts:
         raise ValueError("either `front` or `adapter` must be given for cutadapt")
+
+    if "front" in cutadapt_opts and (
+        cutadapt_opts["front"] is None or cutadapt_opts["front"] == ""
+    ):
+        cutadapt_opts.pop("front")
+    if "adaptor" in cutadapt_opts and (
+        cutadapt_opts["adaptor"] is None or cutadapt_opts["adaptor"] == ""
+    ):
+        cutadapt_opts.pop("adaptor")
 
     cutadapt_opts = " ".join(
         [f"--{k} {v}" if v is not True else f"--{k}" for k, v in cutadapt_opts.items()]
@@ -211,6 +219,10 @@ def run_fastp(input_file, output_file, parallel=4, **kwargs):
 
     output_file = Path(output_file)
     output_file.parent.mkdir(exist_ok=True, parents=True)
+
+    fastp_json = output_file.with_suffix(".json")
+    fastp_html = output_file.with_suffix(".html")
+    fastp_opts += f" --json {fastp_json} --html {fastp_html}"
 
     run = subprocess.run(
         f"fastp -i {input_file} -o {output_file} --thread {parallel} {fastp_opts}",

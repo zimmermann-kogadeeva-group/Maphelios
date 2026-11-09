@@ -9,7 +9,7 @@ from Bio import SeqIO
 
 from maphelios import Mapping
 from maphelios import pacbio as pb
-from maphelios.genome_funcs import get_genome, run_minimap2
+from maphelios.genome_funcs import get_genome, run_minimap2, run_tnseq_aln
 from maphelios.helper import quality_filter
 
 INPUT_FORMATS = {
@@ -20,18 +20,56 @@ INPUT_FORMATS = {
     "fastq": "fastq",
 }
 
-# Bundled example dataset. The sequences are shipped with the app, while the
-# genome is pulled from NCBI through the usual Entrez path, so that we do not
-# have to vendor a multi-megabyte genome file.
+# Bundled example datasets, one per pipeline. Sequences and genome are shipped
+# with the app in app/examples/.
 EXAMPLE_DIR = Path(__file__).parent
+EXAMPLE_GENOME = "examples/BU_ATCC8492.gff.gz"
 
-EXAMPLE = {
-    "label": "B. uniformis ATCC 8492 - Xgal functional screen",
-    "seq_files": ["buni_func_screen_xgal.fasta"],
-    "search_term": "Bacteroides uniformis ATCC 8492",
-    "retmax": 10,
-    "fwd_suf": "-49_F",
-    "rev_suf": "-348_R",
+TNSEQ_ADAPTOR_5P = "TACGAAGACCGGGGACTTATCATCCAACCTGT"
+TNSEQ_ADAPTOR_3P = ""
+
+EXAMPLES = {
+    "sanger": {
+        "label": "Sanger: X-gal functional screen",
+        "seq_files": ["examples/buni_func_screen_xgal.fasta"],
+        "genome_file": EXAMPLE_GENOME,
+        "state": {
+            "seq_type_input": "blast",
+            "genome_src": "File",
+            "pair_seqs": True,
+            "fwd_suf": "-49_F",
+            "rev_suf": "-348_R",
+        },
+    },
+    "longread": {
+        "label": "Long-read: PacBio GOF",
+        "seq_files": ["examples/buni_gof_pacbio_trimmed.fastq.gz"],
+        "genome_file": EXAMPLE_GENOME,
+        "state": {
+            "seq_type_input": "minimap2",
+            "genome_src": "File",
+        },
+    },
+    "shortread": {
+        "label": "Short-read: TnSeq",
+        "seq_files": ["examples/buni_tnseq.fastq.gz"],
+        "genome_file": EXAMPLE_GENOME,
+        "state": {
+            "seq_type_input": "bowtie2",
+            "genome_src": "File",
+            "5p_adaptor": TNSEQ_ADAPTOR_5P,
+            "3p_adaptor": TNSEQ_ADAPTOR_3P,
+        },
+    },
+}
+
+# Form values restored when an example is cleared.
+FORM_DEFAULTS = {
+    "pair_seqs": False,
+    "fwd_suf": "_F",
+    "rev_suf": "_R",
+    "5p_adaptor": "",
+    "3p_adaptor": "",
 }
 
 
@@ -51,51 +89,58 @@ class ExampleFile:
         return self._data
 
 
-def example_seq_paths():
-    return [EXAMPLE_DIR / name for name in EXAMPLE["seq_files"]]
+def example_seq_paths(key):
+    return [EXAMPLE_DIR / name for name in EXAMPLES[key]["seq_files"]]
 
 
-def example_available():
-    return all(path.is_file() for path in example_seq_paths())
+def example_genome_path(key):
+    return EXAMPLE_DIR / EXAMPLES[key]["genome_file"]
 
 
-def load_example():
-    st.session_state.example_loaded = True
-    st.session_state.seq_type_input = "Sanger"
-    st.session_state.genome_src = "NCBI"
-    st.session_state.pair_seqs = True
-    st.session_state.search_term = EXAMPLE["search_term"]
-    st.session_state.retmax = EXAMPLE["retmax"]
-    st.session_state.fwd_suf = EXAMPLE["fwd_suf"]
-    st.session_state.rev_suf = EXAMPLE["rev_suf"]
+def example_missing(key):
+    paths = example_seq_paths(key) + [example_genome_path(key)]
+    return [path.name for path in paths if not path.is_file()]
+
+
+def load_example(key):
+    # Runs as an on_click callback, i.e. before the widgets are rendered, so
+    # the widget values can be set through session state.
+    for name, value in (FORM_DEFAULTS | EXAMPLES[key]["state"]).items():
+        st.session_state[name] = value
+    st.session_state.example = key
 
 
 def clear_example():
-    st.session_state.example_loaded = False
-    st.session_state.search_term = ""
-    st.session_state.retmax = 200
-    st.session_state.pair_seqs = False
+    for name, value in FORM_DEFAULTS.items():
+        st.session_state[name] = value
+    st.session_state.example = None
 
 
 def example_controls():
-    """Button to fill the form with the bundled example dataset."""
+    """One button per bundled example dataset, to fill in the form."""
 
-    if st.session_state.get("example_loaded"):
-        st.button("Clear example data", on_click=clear_example)
-        return
+    st.write("Load example data:")
+    active = st.session_state.get("example")
+    cols = st.columns(len(EXAMPLES))
+    for col, (key, example) in zip(cols, EXAMPLES.items()):
+        missing = example_missing(key)
+        col.button(
+            example["label"],
+            key=f"example_{key}",
+            on_click=load_example,
+            args=(key,),
+            disabled=bool(missing),
+            type="primary" if key == active else "secondary",
+            width="stretch",
+            help=(
+                f"Example data is not installed (missing: {', '.join(missing)})"
+                if missing
+                else f"Fill in the form with the {example['label']} example"
+            ),
+        )
 
-    available = example_available()
-    missing = ", ".join(x.name for x in example_seq_paths() if not x.is_file())
-    st.button(
-        "Load example data",
-        on_click=load_example,
-        disabled=not available,
-        help=(
-            f"Fill in the form with {EXAMPLE['label']}"
-            if available
-            else f"Example data is not installed (missing: {missing})"
-        ),
-    )
+    if active is not None:
+        st.button("Clear example", on_click=clear_example)
 
 
 class TempDirManager:
@@ -115,12 +160,28 @@ class TempDirManager:
             self.temp_dir.cleanup()
 
 
+SEQ_TYPE_LABELS = {
+    "blast": "BLAST (Sanger)",
+    "minimap2": "minimap2 (Longread)",
+    "bowtie2": "bowtie2 (Shortread)",
+}
+
+
 def get_main_inputs(workdir=False):
 
     example_controls()
+    active_example = st.session_state.get("example")
+
+    # Widgets below take their defaults from session state, so that the example
+    # buttons can overwrite them without Streamlit warning about a conflict.
+    for name, value in FORM_DEFAULTS.items():
+        st.session_state.setdefault(name, value)
 
     seq_type = st.radio(
-        "Sequencing type:", ("Sanger", "Longread"), key="seq_type_input"
+        "Sequencing type:",
+        ("blast", "minimap2", "bowtie2"),
+        key="seq_type_input",
+        format_func=lambda x: SEQ_TYPE_LABELS[x],
     )
     st.session_state.seq_type = seq_type
 
@@ -153,6 +214,10 @@ def get_main_inputs(workdir=False):
             key="genome",
             accept_multiple_files=True,
         )
+        # The file uploader cannot be filled in programmatically, so the
+        # example genome is slotted in here instead. User uploads win.
+        if active_example is not None and not genome_fh:
+            genome_fh = [ExampleFile(example_genome_path(active_example))]
 
     seq_fh = st.file_uploader(
         "Sequence file:",
@@ -163,9 +228,13 @@ def get_main_inputs(workdir=False):
 
     # The file uploader cannot be filled in programmatically, so the example
     # sequences are slotted in here instead. Anything the user uploads wins.
-    if st.session_state.get("example_loaded") and not seq_fh:
-        seq_fh = [ExampleFile(path) for path in example_seq_paths()]
-        st.info(f"Example data loaded ({EXAMPLE['label']}) - press Submit to run.")
+    if active_example is not None and not seq_fh:
+        seq_fh = [ExampleFile(path) for path in example_seq_paths(active_example)]
+    if active_example is not None:
+        st.info(
+            f"Example loaded ({EXAMPLES[active_example]['label']}) - "
+            "press Submit to run."
+        )
 
     # Add QC parameters in case ab1 files are submitted
     qc_value, qc_ws = None, None
@@ -191,10 +260,13 @@ def get_main_inputs(workdir=False):
     default_ins_len = 4000
     blast_options = None
 
-    if seq_type == "Sanger":
+    adaptor_5p = None
+    adaptor_3p = None
+
+    if seq_type == "blast":
         if st.toggle("Pair forward and reverse sequences", key="pair_seqs"):
-            fwd_suf = st.text_input("Forward suffix:", "_F", key="fwd_suf")
-            rev_suf = st.text_input("Reverse suffix:", "_R", key="rev_suf")
+            fwd_suf = st.text_input("Forward suffix:", key="fwd_suf")
+            rev_suf = st.text_input("Reverse suffix:", key="rev_suf")
             default_ins_len = st.number_input(
                 "Default insert length:",
                 value=default_ins_len,
@@ -214,6 +286,10 @@ def get_main_inputs(workdir=False):
             if blast_wordsize is not None:
                 blast_options += f" -word_size {blast_wordsize}"
 
+    elif seq_type == "bowtie2":
+        adaptor_5p = st.text_input("5' adaptor:", key="5p_adaptor")
+        adaptor_3p = st.text_input("3' adaptor:", key="3p_adaptor")
+
     workdir_path = None
     if workdir:
         workdir_path = st.text_input("workdir", "Output")
@@ -227,6 +303,8 @@ def get_main_inputs(workdir=False):
         "workdir": workdir_path,
         "avg_insert_len": default_ins_len,
         "blast_options": blast_options,
+        "adaptor_5p": adaptor_5p,
+        "adaptor_3p": adaptor_3p,
         "qc_value": qc_value,
         "qc_ws": qc_ws,
     }
@@ -258,6 +336,8 @@ def run_pipeline(
     workdir=None,
     avg_insert_len=4000,
     blast_options=None,
+    adaptor_5p=None,
+    adaptor_3p=None,
     qc_value=None,
     qc_ws=None,
 ):
@@ -270,7 +350,7 @@ def run_pipeline(
         else:
             genome_path = None
 
-        output_type = "fasta" if seq_type == "Sanger" else "fastq"
+        output_type = "fasta" if seq_type == "blast" else "fastq"
         seq_path = str(dirpath / f"seqs.{output_type}")
         with open(seq_path, "w") as fh:
             for seq in seq_fh:
@@ -295,7 +375,7 @@ def run_pipeline(
                     SeqIO.write(processed_rec, fh, output_type)
 
         try:
-            if seq_type == "Sanger":
+            if seq_type == "blast":
                 res = Mapping(
                     seq_file=seq_path,
                     work_dir=dirpath,
@@ -307,13 +387,34 @@ def run_pipeline(
                     avg_insert_len=avg_insert_len,
                     blast_options=blast_options,
                 )
-            elif seq_type == "Longread":
+            elif seq_type == "minimap2":
+                genome = get_genome(genome_path, search_term=search_term, retmax=retmax)
+
                 run_minimap2(seq_path, genome_path, dirpath / "aln.sam")
+
                 aln = pb.get_longread_aln(
                     dirpath / "aln.sam", dropna=True, blast_like_score=True
                 )
 
-                genome = get_genome(genome_path, search_term=search_term, retmax=retmax)
+                res = {"mapping": aln, "genome": genome}
+            elif seq_type == "bowtie2":
+                # TODO: add more options for cutadapt and fastp
+                genome_fasta = Path(genome_path).with_suffix(".fasta")
+
+                genome = get_genome(
+                    genome_path, genome_fasta, search_term=search_term, retmax=retmax
+                )
+
+                run_tnseq_aln(
+                    seq_path,
+                    genome_fasta,
+                    dirpath / "aln.sam",
+                    cutadapt_kwargs=dict(adaptor=adaptor_3p, front=adaptor_5p),
+                )
+
+                aln = pb.get_shortread_aln(
+                    dirpath / "aln.sam", blast_like_score=True
+                ).assign(reference_end=lambda x: x.reference_start + 1)
 
                 res = {"mapping": aln, "genome": genome}
 

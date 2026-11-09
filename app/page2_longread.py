@@ -203,7 +203,7 @@ def plot_reads(results, supplementary=False, secondary=False):
                 0,
                 contig_length,
                 0,
-                step=10,
+                step=100,
                 key="bp_start_" + genome_label,
             )
         with col2:
