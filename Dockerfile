@@ -24,7 +24,7 @@ RUN curl -L https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.16.0/ncbi-bl
 
 RUN curl -L https://github.com/lh3/minimap2/releases/download/v2.31/minimap2-2.31_x64-linux.tar.bz2 | tar -C /opt/ -jxvf -
 
-RUN curl -L http://opengene.org/fastp/fastp.1.4.0 -o /usr/local/bin/fastp && chmod 755 /usr/loca/bin/fastp
+RUN curl -L http://opengene.org/fastp/fastp.1.4.0 -o /usr/local/bin/fastp && chmod 755 /usr/local/bin/fastp
 
 RUN curl -L https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.5.5/bowtie2-2.5.5-linux-x86_64.zip/download -o bowtie.zip && \
     unzip bowtie.zip -d /opt/ && \
