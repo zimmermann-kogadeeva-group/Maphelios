@@ -25,6 +25,7 @@ dependencies = [
     "pycirclize>=1.9.1",
     "scipy>=1.13.1",
     "seaborn>=0.13.2",
+    "cutadapt>=5.2",
 ]
 
 [project.optional-dependencies]

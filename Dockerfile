@@ -24,8 +24,14 @@ RUN curl -L https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.16.0/ncbi-bl
 
 RUN curl -L https://github.com/lh3/minimap2/releases/download/v2.31/minimap2-2.31_x64-linux.tar.bz2 | tar -C /opt/ -jxvf -
 
+RUN curl -L http://opengene.org/fastp/fastp -o /usr/local/bin/fastp && chmod 755 /usr/loca/bin/fastp
+
+RUN curl -L https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.5.5/bowtie2-2.5.5-linux-x86_64.zip/download -o bowtie.zip && \
+    unzip bowtie.zip -d /opt/ && \
+    rm bowtie.zip
+
 # Updating path env var
-ENV PATH="/app/.venv/bin:/opt/ncbi-blast-2.16.0+/bin:/opt/minimap2-2.31_x64-linux:${PATH}"
+ENV PATH="/app/.venv/bin:/opt/ncbi-blast-2.16.0+/bin:/opt/minimap2-2.31_x64-linux:/opt/bowtie2-2.5.5-linux-x86_64/:${PATH}"
 
 # Cleaning up
 RUN apt remove --purge -y curl zip && apt clean && rm -rf /var/lib/apt/lists/*
