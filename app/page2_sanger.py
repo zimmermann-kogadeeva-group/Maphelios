@@ -278,6 +278,10 @@ def sidebar_opts():
         st.session_state.retmax = 200
         st.session_state.pair_seqs = False
 
+        st.session_state.example_active = False
+        st.session_state.chosen_example = None
+        st.session_state.example = None
+
         st.rerun()
 
     tabbed = st.sidebar.toggle("Tabbed interface", True)

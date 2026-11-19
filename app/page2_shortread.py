@@ -39,6 +39,11 @@ def sidebar_opts():
     if st.sidebar.button("Reset", use_container_width=True):
         st.session_state.stage = 0
         st.session_state.search_term_count = 1
+
+        st.session_state.example_active = False
+        st.session_state.chosen_example = None
+        st.session_state.example = None
+
         st.rerun()
 
     tabbed = st.sidebar.toggle("Tabbed interface", True)

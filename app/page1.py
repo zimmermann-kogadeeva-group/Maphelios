@@ -12,6 +12,9 @@ from maphelios import pacbio as pb
 from maphelios.genome_funcs import get_genome, run_minimap2, run_tnseq_aln
 from maphelios.helper import quality_filter
 
+if "example_active" not in st.session_state:
+    st.session_state.example_active = False
+
 INPUT_FORMATS = {
     "fasta": "fasta",
     "fas": "fasta",
@@ -31,6 +34,15 @@ TNSEQ_ADAPTOR_3P = ""
 EXAMPLES = {
     "sanger": {
         "label": "Sanger: X-gal functional screen",
+        "description": (
+            "Sanger end-sequencing of 13 clones picked from an X-gal functional "
+            "screen of a *Bacteroides uniformis* ATCC 8492 genomic library. "
+            "Each clone was sequenced from both ends of the insert (forward "
+            "primer `-49_F`, reverse primer `-348_R`), giving 26 reads. The "
+            "reads are mapped with BLAST and paired by clone name, so each "
+            "insert's position, orientation and length can be recovered and "
+            "the genes it carries shown on the genome."
+        ),
         "seq_files": ["examples/buni_func_screen_xgal.fasta"],
         "genome_file": EXAMPLE_GENOME,
         "state": {
@@ -43,6 +55,15 @@ EXAMPLES = {
     },
     "longread": {
         "label": "Long-read: PacBio GOF",
+        "description": (
+            "PacBio HiFi (CCS) reads from a gain-of-function screen of a "
+            "*Bacteroides uniformis* ATCC 8492 genomic library. Vector "
+            "sequence has already been trimmed off, so each read (5,000 "
+            "reads, ~2.7 kb on average) covers part or all of a cloned "
+            "insert. The reads are aligned with minimap2 and stacked on "
+            "the genome, so regions picked up repeatedly in the screen "
+            "show up as coverage peaks over the genes they contain."
+        ),
         "seq_files": ["examples/buni_gof_pacbio_trimmed.fastq.gz"],
         "genome_file": EXAMPLE_GENOME,
         "state": {
@@ -52,6 +73,15 @@ EXAMPLES = {
     },
     "shortread": {
         "label": "Short-read: TnSeq",
+        "description": (
+            "A subsample of 2,000 Illumina NextSeq reads (150 bp) from a "
+            "transposon-insertion sequencing (TnSeq) library in *Bacteroides "
+            "uniformis* ATCC 8492. Each read runs from the transposon end into "
+            "the flanking genomic DNA. The 5' adaptor (filled in below) cuts "
+            "off the transposon sequence before the remaining genomic part is "
+            "aligned with bowtie2, so each read marks one insertion site in "
+            "the genome."
+        ),
         "seq_files": ["examples/buni_tnseq.fastq.gz"],
         "genome_file": EXAMPLE_GENOME,
         "state": {
@@ -102,44 +132,56 @@ def example_missing(key):
     return [path.name for path in paths if not path.is_file()]
 
 
-def load_example(key):
+def load_example():
     # Runs as an on_click callback, i.e. before the widgets are rendered, so
     # the widget values can be set through session state.
-    for name, value in (FORM_DEFAULTS | EXAMPLES[key]["state"]).items():
-        st.session_state[name] = value
-    st.session_state.example = key
+    key = st.session_state.chosen_example
+    if key is not None:
+        for name, value in (FORM_DEFAULTS | EXAMPLES[key]["state"]).items():
+            st.session_state[name] = value
+        st.session_state.example = key
 
 
 def clear_example():
     for name, value in FORM_DEFAULTS.items():
         st.session_state[name] = value
     st.session_state.example = None
+    st.session_state.chosen_example = None
+    st.session_state.example_active = False
+
+
+def flip_example():
+    st.session_state.example_active = not st.session_state.example_active
 
 
 def example_controls():
-    """One button per bundled example dataset, to fill in the form."""
+    if not st.session_state.example_active:
+        st.button("Load example data", on_click=flip_example, width="stretch")
+    if st.session_state.example_active:
 
-    st.write("Load example data:")
-    active = st.session_state.get("example")
-    cols = st.columns(len(EXAMPLES))
-    for col, (key, example) in zip(cols, EXAMPLES.items()):
-        missing = example_missing(key)
-        col.button(
-            example["label"],
-            key=f"example_{key}",
-            on_click=load_example,
-            args=(key,),
-            disabled=bool(missing),
-            type="primary" if key == active else "secondary",
-            width="stretch",
-            help=(
-                f"Example data is not installed (missing: {', '.join(missing)})"
-                if missing
-                else f"Fill in the form with the {example['label']} example"
-            ),
+        active = st.session_state.get("chosen_example")
+        st.selectbox(
+            "Load an example",
+            EXAMPLES.keys(),
+            key="chosen_example",
+            index=None,
+            on_change=load_example,
+            placeholder=None,
+            format_func=lambda x: EXAMPLES[x]["label"],
         )
 
-    if active is not None:
+        if active is not None:
+
+            genome_info = (
+                "\n\nReference: *B. uniformis* ATCC 8492 genome with annotation "
+                "(GFF with embedded sequence, 2 contigs, 3,844 genes)."
+            )
+            st.markdown(EXAMPLES[active]["description"] + genome_info)
+
+            st.info(
+                f"Example loaded ({EXAMPLES[active]['label']}) - "
+                "press Submit to run."
+            )
         st.button("Clear example", on_click=clear_example)
 
 
@@ -167,8 +209,55 @@ SEQ_TYPE_LABELS = {
 }
 
 
+def tool_description():
+    st.markdown(
+        "Maphelios maps sequenced inserts, reads or transposon insertion "
+        "sites onto a reference genome and shows where they land, together "
+        "with the annotated genes around them. Use it to find out which "
+        "genomic region a clone carries, which regions come up repeatedly in "
+        "a screen, or where transposons have inserted."
+    )
+    with st.expander("How it works"):
+        seq_types_table = "\n".join(
+            [
+                "| Type | Aligner | Typical data | What you get |",
+                "|---|---|---|---|",
+                "| Sanger | BLAST | End-sequencing of clones (FASTA, AB1) "
+                "| Each insert's position, orientation and length. Forward and "
+                "reverse reads can be paired by name suffix to recover the "
+                "full insert. |",
+                "| Long-read | minimap2 | PacBio HiFi reads (FASTQ) "
+                "| Reads stacked on the genome, so regions picked up "
+                "repeatedly show up as coverage peaks. |",
+                "| Short-read | bowtie2 | Illumina TnSeq reads (FASTQ) "
+                "| Adaptor/transposon sequence is trimmed off, then each read "
+                "marks one insertion site. |",
+            ]
+        )
+        st.markdown(f"""
+**1. Choose a reference genome** - search NCBI by name or accession, or
+upload your own (GenBank, GFF with embedded sequence, or FASTA). Several
+genomes can be given at once, and the sequences are mapped to each one
+separately.
+
+**2. Pick the sequencing type** to match your data:
+
+{seq_types_table}
+
+**3. Upload your sequences** (FASTA, AB1 or FASTQ, optionally gzipped).
+Reads with base qualities (AB1, FASTQ) can be quality-trimmed first.
+
+**4. Submit** to run the mapping, then explore the results: plots of the
+genome and of individual inserts with the overlapping genes, and tables you
+can download.
+
+Not sure where to start? Load one of the example datasets below.
+""")
+
+
 def get_main_inputs(workdir=False):
 
+    tool_description()
     example_controls()
     active_example = st.session_state.get("example")
 
@@ -176,14 +265,6 @@ def get_main_inputs(workdir=False):
     # buttons can overwrite them without Streamlit warning about a conflict.
     for name, value in FORM_DEFAULTS.items():
         st.session_state.setdefault(name, value)
-
-    seq_type = st.radio(
-        "Sequencing type:",
-        ("blast", "minimap2", "bowtie2"),
-        key="seq_type_input",
-        format_func=lambda x: SEQ_TYPE_LABELS[x],
-    )
-    st.session_state.seq_type = seq_type
 
     # Radio buttons to switch between text input and file upload
     genome_src = st.radio("Genome:", ("NCBI", "File"), key="genome_src")
@@ -219,6 +300,14 @@ def get_main_inputs(workdir=False):
         if active_example is not None and not genome_fh:
             genome_fh = [ExampleFile(example_genome_path(active_example))]
 
+    seq_type = st.radio(
+        "Sequencing type:",
+        ("blast", "minimap2", "bowtie2"),
+        key="seq_type_input",
+        format_func=lambda x: SEQ_TYPE_LABELS[x],
+    )
+    st.session_state.seq_type = seq_type
+
     seq_fh = st.file_uploader(
         "Sequence file:",
         type=["fasta", "fas", "fna", "ab1", "fastq", "fastq.gz"],
@@ -230,11 +319,6 @@ def get_main_inputs(workdir=False):
     # sequences are slotted in here instead. Anything the user uploads wins.
     if active_example is not None and not seq_fh:
         seq_fh = [ExampleFile(path) for path in example_seq_paths(active_example)]
-    if active_example is not None:
-        st.info(
-            f"Example loaded ({EXAMPLES[active_example]['label']}) - "
-            "press Submit to run."
-        )
 
     # Add QC parameters in case ab1 files are submitted
     qc_value, qc_ws = None, None
