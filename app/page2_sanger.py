@@ -309,7 +309,7 @@ def sidebar_params():
         "Filter threshold:",
         min_value=0.0,
         max_value=1.0,
-        value=0.7,
+        value=0.5,
         help=(
             "Threshold value for insert coverage value. Insert coverage here is the "
             "ratio of length of sequence mapped to genome to the length of the whole "
