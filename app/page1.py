@@ -155,34 +155,37 @@ def flip_example():
 
 
 def example_controls():
-    if not st.session_state.example_active:
-        st.button("Load example data", on_click=flip_example, width="stretch")
-    if st.session_state.example_active:
+    # Keyed container so the guided tour can point at the controls as a whole,
+    # whichever of them are currently shown (see tour.py)
+    with st.container(key="example_data"):
+        if not st.session_state.example_active:
+            st.button("Load example data", on_click=flip_example, width="stretch")
+        if st.session_state.example_active:
 
-        active = st.session_state.get("chosen_example")
-        st.selectbox(
-            "Load an example",
-            EXAMPLES.keys(),
-            key="chosen_example",
-            index=None,
-            on_change=load_example,
-            placeholder=None,
-            format_func=lambda x: EXAMPLES[x]["label"],
-        )
-
-        if active is not None:
-
-            genome_info = (
-                "\n\nReference: *B. uniformis* ATCC 8492 genome with annotation "
-                "(GFF with embedded sequence, 2 contigs, 3,844 genes)."
+            active = st.session_state.get("chosen_example")
+            st.selectbox(
+                "Load an example",
+                EXAMPLES.keys(),
+                key="chosen_example",
+                index=None,
+                on_change=load_example,
+                placeholder=None,
+                format_func=lambda x: EXAMPLES[x]["label"],
             )
-            st.markdown(EXAMPLES[active]["description"] + genome_info)
 
-            st.info(
-                f"Example loaded ({EXAMPLES[active]['label']}) - "
-                "press Submit to run."
-            )
-        st.button("Clear example", on_click=clear_example)
+            if active is not None:
+
+                genome_info = (
+                    "\n\nReference: *B. uniformis* ATCC 8492 genome with annotation "
+                    "(GFF with embedded sequence, 2 contigs, 3,844 genes)."
+                )
+                st.markdown(EXAMPLES[active]["description"] + genome_info)
+
+                st.info(
+                    f"Example loaded ({EXAMPLES[active]['label']}) - "
+                    "press Submit to run."
+                )
+            st.button("Clear example", on_click=clear_example)
 
 
 class TempDirManager:
@@ -217,7 +220,7 @@ def tool_description():
         "genomic region a clone carries, which regions come up repeatedly in "
         "a screen, or where transposons have inserted."
     )
-    with st.expander("How it works"):
+    with st.expander("How it works", key="how_it_works"):
         seq_types_table = "\n".join(
             [
                 "| Type | Aligner | Typical data | What you get |",
@@ -322,12 +325,14 @@ def get_main_inputs(workdir=False):
 
     # Add QC parameters in case ab1 files are submitted
     qc_value, qc_ws = None, None
-    if any([seq.name.endswith((".ab1", ".fastq", "fastq.gz")) for seq in seq_fh]):
+    has_quals = any(seq.name.endswith((".ab1", ".fastq", "fastq.gz")) for seq in seq_fh)
+    if has_quals:
         qc_value = st.number_input(
             "Quality filtering - threshold",
             value=None,
             min_value=0,
             max_value=40,
+            key="qc_value",
             help=(
                 "Threshold value for Phred quality score filtering "
                 "below which to remove reads"
@@ -337,6 +342,7 @@ def get_main_inputs(workdir=False):
             "Quality filtering - window size",
             value=None,
             min_value=1,
+            key="qc_ws",
             help="Size of the moving window in Phred quality score filtering",
         )
 
@@ -362,7 +368,7 @@ def get_main_inputs(workdir=False):
                 ),
             )
 
-        with st.expander("Additional BLAST settings"):
+        with st.expander("Additional BLAST settings", key="blast_settings"):
             blast_evalue = st.number_input("E-value", value=10.0, format="%0.3f")
             blast_wordsize = st.number_input("Word size", value=None, min_value=4)
 
@@ -377,6 +383,14 @@ def get_main_inputs(workdir=False):
     workdir_path = None
     if workdir:
         workdir_path = st.text_input("workdir", "Output")
+
+    # Which of the optional inputs above ended up on the page, so that the
+    # guided tour only points at widgets that exist (see tour.py)
+    st.session_state.tour_inputs = {
+        "genome_src": genome_src,
+        "seq_type": seq_type,
+        "quality_filter": has_quals,
+    }
 
     most_inputs = {
         "seq_type": seq_type,

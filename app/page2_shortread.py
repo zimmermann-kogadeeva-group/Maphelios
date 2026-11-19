@@ -36,7 +36,7 @@ def convert_df(df, **kwargs):
 
 
 def sidebar_opts():
-    if st.sidebar.button("Reset", use_container_width=True):
+    if st.sidebar.button("Reset", key="reset", use_container_width=True):
         st.session_state.stage = 0
         st.session_state.search_term_count = 1
 
@@ -46,21 +46,26 @@ def sidebar_opts():
 
         st.rerun()
 
-    tabbed = st.sidebar.toggle("Tabbed interface", True)
+    tabbed = st.sidebar.toggle("Tabbed interface", True, key="tabbed")
     if tabbed:
-        genome_view, insert_view = st.tabs(["Genome view", "Insert view"])
+        genome_view, insert_view = st.tabs(["Genome view", "Insert view"], key="views")
+        # Only the open tab is visible, so the guided tour sticks to it
+        view = "genome" if genome_view.open else "insert"
     else:
         genome_view, insert_view = st.columns(2)
+        view = "both"
+    st.session_state.tour_results = {"view": view}
     return genome_view, insert_view
 
 
 def select_genomes(all_results):
-    st.sidebar.write("Genomes:")
-    return {
-        name: res
-        for name, res in all_results.items()
-        if st.sidebar.checkbox(name, True)
-    }
+    # Keyed container so the guided tour can point at the checkboxes as a
+    # group, however many genomes there are (see tour.py)
+    with st.sidebar.container(key="genome_select"):
+        st.write("Genomes:")
+        return {
+            name: res for name, res in all_results.items() if st.checkbox(name, True)
+        }
 
 
 def count_unique_ins(positions, start, end):
@@ -114,7 +119,7 @@ def qc_plots(mapping, genome):
 
 def plot_genomes(results, supplementary=False, secondary=False):
     # TODO: plotting options
-    with st.expander("Plotting options"):
+    with st.expander("Plotting options", key="genome_plot_options"):
         circos_opts = dict(
             bin_size=st.number_input("Bin size:", 1, 100000, 5000),
             track_sep=st.selectbox(
@@ -157,7 +162,7 @@ def plot_genomes(results, supplementary=False, secondary=False):
         st.pyplot(fig)
         plt.close()
 
-        with st.expander("QC plots"):
+        with st.expander("QC plots", key=f"qc_plots_{genome_label}"):
             fig = qc_plots(df_aln, res["genome"])
             st.pyplot(fig)
             plt.close()
@@ -182,7 +187,7 @@ def plot_reads(results, supplementary=False, secondary=False):
     # To store the buffers that will hold the images
     svg_buffers = dict()
 
-    with st.expander("Plotting options"):
+    with st.expander("Plotting options", key="insert_plot_options"):
         seq_view_opts = dict(
             reads_height=st.slider(
                 "Reads view height:", 1.0, 10.0, 2.0, key="reads_height"
@@ -275,7 +280,7 @@ def plot_reads(results, supplementary=False, secondary=False):
             df_genes = df_genes.drop(columns=["sequence"]).pipe(
                 pb.reorder_cols, cols_order
             )
-        with st.expander("Table of genes"):
+        with st.expander("Table of genes", key=f"genes_table_{genome_label}"):
             st.write(df_genes)
 
     zip_buffer = BytesIO()
@@ -311,6 +316,9 @@ def shortread_results():
         chosen_res = select_genomes(all_results)
 
         if len(chosen_res):
+            # The read-level widgets are keyed per genome, so the guided tour
+            # points at the first one shown (see tour.py)
+            st.session_state.tour_results["genome"] = next(iter(chosen_res))
 
             with genome_view:
                 st.header("Genome view")
@@ -322,11 +330,13 @@ def shortread_results():
                     supplementary=st.toggle(
                         "Filter supplementary reads",
                         False,
+                        key="filter_supplementary",
                         help=supl_reads_help,
                     ),
                     secondary=st.toggle(
                         "Filter secondary reads",
                         False,
+                        key="filter_secondary",
                         help=sec_reads_help,
                     ),
                 )
@@ -339,7 +349,7 @@ def shortread_results():
                     ignore_index=True,
                 )
 
-                with st.expander("Table of all mapped seqs"):
+                with st.expander("Table of all mapped seqs", key="inserts_table"):
                     st.write(df_inserts)
                     # download all inserts
                     st.download_button(
@@ -349,7 +359,10 @@ def shortread_results():
                         mime="text/csv",
                         use_container_width=True,
                     )
-                with st.expander("Number of supplementary and secondary alignments"):
+                with st.expander(
+                    "Number of supplementary and secondary alignments",
+                    key="aln_counts",
+                ):
                     st.write(
                         df_inserts.groupby("genome")
                         .agg(

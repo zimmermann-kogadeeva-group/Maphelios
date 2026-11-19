@@ -29,7 +29,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-streamlit = ["streamlit"]
+streamlit = [
+    "streamlit",
+    "streamlit-tour>=1.1.0 ; python_full_version >= '3.10'",
+]
 
 [project.urls]
 "Homepage" = "https://git.embl.de/grp-zimmermann-kogadeeva/Maphelios"

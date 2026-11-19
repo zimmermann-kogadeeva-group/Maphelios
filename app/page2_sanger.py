@@ -74,7 +74,7 @@ def plot_inserts(
     clusters2 = clusters.other_repr
 
     # Get display options from the user
-    with st.expander("Plotting options"):
+    with st.expander("Plotting options", key="insert_plot_options"):
         if st.toggle("Display CDS", value=True):
             feature_types.update(("CDS",))
         if st.toggle("Display genes", value=True):
@@ -195,7 +195,7 @@ def plot_genomes(
     num_cols = None
 
     # Get plotting options
-    with st.expander("Plotting options"):
+    with st.expander("Plotting options", key="genome_plot_options"):
         show_contig_labels = st.toggle("Show contig labels", value=True)
         show_seq_labels = st.toggle("Show seq labels", value=True)
         cluster_labels = st.toggle("Show cluster labels", value=True)
@@ -269,7 +269,7 @@ def plot_genomes(
 
 
 def sidebar_opts():
-    if st.sidebar.button("Reset", use_container_width=True):
+    if st.sidebar.button("Reset", key="reset", use_container_width=True):
         st.session_state.stage = 0
         st.session_state.search_term_count = 1
 
@@ -284,11 +284,15 @@ def sidebar_opts():
 
         st.rerun()
 
-    tabbed = st.sidebar.toggle("Tabbed interface", True)
+    tabbed = st.sidebar.toggle("Tabbed interface", True, key="tabbed")
     if tabbed:
-        genome_view, insert_view = st.tabs(["Genome view", "Insert view"])
+        genome_view, insert_view = st.tabs(["Genome view", "Insert view"], key="views")
+        # Only the open tab is visible, so the guided tour sticks to it
+        view = "genome" if genome_view.open else "insert"
     else:
         genome_view, insert_view = st.columns(2)
+        view = "both"
+    st.session_state.tour_results = {"view": view}
     return genome_view, insert_view
 
 
@@ -297,6 +301,7 @@ def sidebar_params():
     insert_type = st.sidebar.selectbox(
         "Insert type:",
         ["both", "paired", "unpaired"],
+        key="insert_type",
         help=(
             "There are two types of inserts: paired and unpaired. Paired are when "
             "both forward and reverse sequences could be paired to one another. "
@@ -310,6 +315,7 @@ def sidebar_params():
         min_value=0.0,
         max_value=1.0,
         value=0.5,
+        key="filter_threshold",
         help=(
             "Threshold value for insert coverage value. Insert coverage here is the "
             "ratio of length of sequence mapped to genome to the length of the whole "
@@ -323,6 +329,7 @@ def sidebar_params():
         max_value=10000,
         value=4000,
         step=10,
+        key="buffer",
         help="Number of bases either side of the mapped read(s)",
     )
 
@@ -346,12 +353,11 @@ def get_pairing_info(data):
 
 
 def select_genomes(genome_labels):
-    st.sidebar.write("Genomes:")
-    res_choice = [
-        name
-        for idx, name in enumerate(genome_labels)
-        if st.sidebar.checkbox(name, True)
-    ]
+    # Keyed container so the guided tour can point at the checkboxes as a
+    # group, however many genomes there are (see tour.py)
+    with st.sidebar.container(key="genome_select"):
+        st.write("Genomes:")
+        res_choice = [name for name in genome_labels if st.checkbox(name, True)]
 
     return res_choice
 
@@ -362,6 +368,7 @@ def select_seq_id(possible_seq_ids, possible_clusters):
         "Select sequence id / cluster:",
         possible_seq_ids + possible_clusters.cluster_labels,
         None,
+        key="seq_select",
         format_func=lambda x: (
             f"{x[0]} - cluster {x[1]}" if isinstance(x, (list, tuple)) else x
         ),
@@ -428,7 +435,7 @@ def sanger_results():
                     "Mapping information (sequences to genomes)", divider="green"
                 )
 
-                with st.expander("Table of all mapped seqs"):
+                with st.expander("Table of all mapped seqs", key="inserts_table"):
                     st.write(df_inserts)
                     # download all inserts
                     st.download_button(
@@ -439,7 +446,7 @@ def sanger_results():
                         use_container_width=True,
                     )
 
-                with st.expander("Presence/absence table"):
+                with st.expander("Presence/absence table", key="presence_table"):
                     show_mapped = st.checkbox("Show mapped", value=True)
                     show_unmapped = st.checkbox("Show unmapped", value=True)
                     if show_mapped and not show_unmapped:
@@ -449,13 +456,13 @@ def sanger_results():
                     else:
                         st.write(df_insert_pa)
 
-                with st.expander("Sequence pairing info"):
+                with st.expander("Sequence pairing info", key="pairing_info"):
                     st.write(df_inserts.pipe(get_pairing_info))
 
                 # ==== Quality plots section ====
                 st.subheader("Quality plots", divider="green")
 
-                with st.expander("Distribution of mapped seqs"):
+                with st.expander("Distribution of mapped seqs", key="dist_plot"):
                     plot_inserts_dist(df_inserts)
 
                 # ====  Plot sequences on genomes section ====
@@ -482,7 +489,7 @@ def sanger_results():
                     "Mapping information (genes to sequences)", divider="green"
                 )
 
-                with st.expander("Table of genes in all sequences"):
+                with st.expander("Table of genes in all sequences", key="genes_table"):
                     st.write(df_genes)
 
                     st.download_button(

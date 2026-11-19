@@ -9,6 +9,7 @@ from page2_longread import longread_results
 from page2_sanger import sanger_results
 from page2_shortread import shortread_results
 from PIL import Image
+from tour import input_tour, results_tour
 
 from maphelios import __version__
 
@@ -74,21 +75,35 @@ def main():
     col1, col2 = st.columns((6, 1), gap="large", vertical_alignment="bottom")
 
     if st.session_state.stage == 0:
-        st.html(logo_html())
-        st.caption(f"*:grey[v{__version__}]*")
+        with col1:
+            st.html(logo_html())
+            st.caption(f"*:grey[v{__version__}]*")
         all_inputs = get_main_inputs(args.workdir)
-        st.button("Submit", on_click=submit, args=[all_inputs], width="stretch")
+        st.button(
+            "Submit", key="submit", on_click=submit, args=[all_inputs], width="stretch"
+        )
+        # Written into the column reserved above once the inputs are known, so
+        # that the tour only points at the inputs actually on the page
+        with col2:
+            input_tour()
 
     if st.session_state.stage >= 1:
         # Rendered before the results pages add their sidebar widgets, so it
         # sits at the top of the sidebar
         st.sidebar.html(logo_html(width=SIDEBAR_LOGO_WIDTH))
+        # Filled in below, once the results have told the tour which view is
+        # open; the slot keeps the button up here next to the logo
+        tour_slot = st.sidebar.container(key="tour_slot")
+
         if st.session_state.seq_type == "blast":
             sanger_results()
         elif st.session_state.seq_type == "minimap2":
             longread_results()
         elif st.session_state.seq_type == "bowtie2":
             shortread_results()
+
+        with tour_slot:
+            results_tour(st.session_state.seq_type)
 
 
 if __name__ == "__main__":

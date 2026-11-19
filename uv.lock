@@ -2549,7 +2549,7 @@ wheels = [
 
 [[package]]
 name = "maphelios"
-version = "0.10.0"
+version = "0.11.1"
 source = { editable = "." }
 dependencies = [
     { name = "bcbio-gff" },
@@ -2576,6 +2576,7 @@ dependencies = [
 streamlit = [
     { name = "streamlit", version = "1.50.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "streamlit", version = "1.58.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "streamlit-tour", marker = "python_full_version >= '3.10'" },
 ]
 
 [package.dev-dependencies]
@@ -2598,6 +2599,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.13.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "streamlit", marker = "extra == 'streamlit'" },
+    { name = "streamlit-tour", marker = "python_full_version >= '3.10' and extra == 'streamlit'", specifier = ">=1.1.0" },
 ]
 provides-extras = ["streamlit"]
 
@@ -5231,6 +5233,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/91/74/20dac6d6200d6ec0e1c230fb8eeb6a1a423645eacb76e8d802adfc246456/streamlit-1.58.0.tar.gz", hash = "sha256:78a22e7085b053af7ce544442bf4b670771e68c509ba1bdaa056ba0708f49c3d", size = 8721149 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/df/84/14c36a92fb24f8e1cea452f53b0744b5da69d52cdd2fe22e71e6fbf765d5/streamlit-1.58.0-py3-none-any.whl", hash = "sha256:4ca8a7afc5bd16a5f176ccf4be1e34e8121cad0240becd127fb58a103ea3178d", size = 9219185 },
+]
+
+[[package]]
+name = "streamlit-tour"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "streamlit", version = "1.58.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f1/58/a5b31838ff8ac81ba8220c4abc057b9d9b0cfc1e78dbd4a6904cf6bba22a/streamlit_tour-1.1.0.tar.gz", hash = "sha256:034712c8e7c13743c7af4eb2163ecfa8c41ffd969e9def1ec992bef3d91b62d9", size = 32157 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8f/a4/00dd225f3e55587ecf02e8bcf575e164e94bdfb4e9e7042a9fccb7a5461e/streamlit_tour-1.1.0-py3-none-any.whl", hash = "sha256:595a3f463dfe6779031b5540910928462a4c2bd0c8554bb210cfe9a9dcd9ff97", size = 31213 },
 ]
 
 [[package]]
