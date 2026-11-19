@@ -8,7 +8,7 @@ import seaborn as sns
 import streamlit as st
 
 from maphelios import pacbio as pb
-from maphelios.helper import get_genes, get_graphic_record_genes
+from maphelios.helper import get_genes, get_graphic_record_genes, nice_ticks
 
 FORMATS = (".gff", ".gbk", ".fasta")
 
@@ -102,7 +102,7 @@ def qc_plots(mapping, genome):
     axs[1].axvline(df_genes.gene_len.mean(), ls="--", color="black")
     axs[1].axhline(df_genes.count_unique_ins.mean(), ls="--", color="black")
 
-    axs[1].set(xlabel="number of reads per bp", ylabel="count")
+    axs[1].set(xlabel="Gene length", ylabel="Number of unique insertions")
 
     return fig
 
@@ -177,6 +177,16 @@ def plot_reads(results, supplementary=False, secondary=False):
     # To store the buffers that will hold the images
     svg_buffers = dict()
 
+    with st.expander("Plotting options"):
+        seq_view_opts = dict(
+            reads_height=st.slider(
+                "Reads view height:", 1.0, 10.0, 2.0, key="reads_height"
+            ),
+            genes_height=st.slider(
+                "Reads view height:", 1.0, 10.0, 5.0, key="genes_height"
+            ),
+            labels=st.toggle("Show labels", False),
+        )
     for genome_label, res in results.items():
         st.subheader(strip_ext(genome_label), divider="gray")
         contigs = res["genome"].keys()
@@ -217,22 +227,30 @@ def plot_reads(results, supplementary=False, secondary=False):
         end = start + width
 
         df_aln = res["mapping"].pipe(filter_reads, supplementary, secondary)
-        fig, axs = plt.subplots(2, 1)
+        h1 = seq_view_opts.pop("reads_height")
+        h2 = seq_view_opts.pop("genes_height")
 
-        axs[0].hist(
+        fig, axes = plt.subplots(
+            2, 1, figsize=(6, h1 + h2), height_ratios=(h1, h2), sharex=True
+        )
+
+        axes[0].hist(
             df_aln.query(
                 "reference_name == @contig_choice and @end > reference_start > @start"
             ).reference_start,
             density=False,
             bins=np.arange(start, end, bin_size),
         )
+        axes[0].spines[["top", "right"]].set_visible(False)
+        axes[0].set_ylabel("Count")
 
         rec = get_graphic_record_genes(
             contig,
             start,
             start + width,
         )
-        _ = rec.plot(ax=axs[1])
+        _ = rec.plot(ax=axes[1])
+        axes[1].set_xticks(nice_ticks(start, start + width, 5))
 
         # Save the svg figure in a buffer
         img_buffer = BytesIO()
@@ -271,6 +289,14 @@ def plot_reads(results, supplementary=False, secondary=False):
 
 
 def shortread_results():
+    supl_reads_help = (
+        "Supplementary reads are mapping positions of parts of the read. "
+        "More information at <https://samtools.github.io/hts-specs/SAMv1.pdf>"
+    )
+    sec_reads_help = (
+        "Secondary reads are alternative mapping positions for entire read. "
+        "More information at <https://samtools.github.io/hts-specs/SAMv1.pdf>"
+    )
 
     if st.session_state.results is not None:
         genome_view, insert_view = sidebar_opts()
@@ -288,8 +314,16 @@ def shortread_results():
                 st.subheader("Mapping information (reads to refs)", divider="green")
 
                 filters = dict(
-                    supplementary=st.toggle("Filter supplementary reads", False),
-                    secondary=st.toggle("Filter secondary reads", False),
+                    supplementary=st.toggle(
+                        "Filter supplementary reads",
+                        False,
+                        help=supl_reads_help,
+                    ),
+                    secondary=st.toggle(
+                        "Filter secondary reads",
+                        False,
+                        help=sec_reads_help,
+                    ),
                 )
 
                 df_inserts = pd.concat(

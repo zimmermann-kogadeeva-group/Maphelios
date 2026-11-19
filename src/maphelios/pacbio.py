@@ -18,7 +18,7 @@ from matplotlib import color_sequences
 from matplotlib.lines import Line2D
 from pycirclize import Circos
 
-from .helper import fig_axvline, get_graphic_record_genes
+from .helper import fig_axvline, get_graphic_record_genes, nice_ticks
 
 
 def shift_feature(feature, shift=0):
@@ -325,26 +325,6 @@ def add_global_ticks(
         )
 
 
-def _fix_y_ticks(y_max, y_step, y_num_steps_min=4, y_num_steps_max=20):
-
-    if y_step > y_max:
-        new_y_step = max(round(y_max, -2) // y_num_steps_min, 1)
-        warn(
-            f"y_step was too large ({y_step} > {y_max}): changed y_step to {new_y_step}"
-        )
-        y_step = new_y_step
-
-    y_num_steps = y_max // y_step
-    if y_num_steps > y_num_steps_max:
-        y_step = max(round(y_max / y_num_steps_max), 1)
-        warn(
-            f"y_step was too small, resulting in too many yticks ({y_num_steps}): "
-            f"changed y_step to {y_step}"
-        )
-    y_ticks = np.arange(0, y_max + y_step, y_step)
-    return y_step, y_ticks
-
-
 def plot_single_track(
     circos,
     counts_binned,
@@ -352,9 +332,7 @@ def plot_single_track(
     bin_size,
     track_radii,
     r_pad_ratio=0.1,
-    y_step=1000,
-    y_num_steps_min=4,
-    y_num_steps_max=20,
+    y_ticks=None,
     y_max=None,
     xticks_by_interval=None,
     xticks_orient="vertical",
@@ -370,7 +348,8 @@ def plot_single_track(
 
     if y_max is None:
         y_max = get_max_across_contigs(counts_binned)
-    y_step, y_ticks = _fix_y_ticks(y_max, y_step, y_num_steps_min, y_num_steps_max)
+    if y_ticks is None:
+        y_ticks = np.arange(0, y_max, 100)
 
     y_labels = list(map(str, y_ticks))
     if log_scale:
@@ -489,9 +468,7 @@ def plot_circos(
     xticks_ruler_width=2,
     xticks_kwargs=None,
     yticks_kwargs=None,
-    y_step=1_000,
-    y_num_steps_min=4,
-    y_num_steps_max=20,
+    yticks_num=4,
     same_y_scale=False,
     palette="tab10",
     legend=False,
@@ -541,6 +518,8 @@ def plot_circos(
         y_max = max(y_maxs.values())
         y_maxs = {name: y_max for name, val in y_maxs.items()}
 
+    y_ticks = {name: nice_ticks(0, y_max, yticks_num) for name, y_max in y_maxs.items()}
+
     num_tracks = len(all_binned_contigs)
     track_r_vals = np.linspace(track_r_min, track_r_max, num_tracks + 1)
     track_r_pairs = [
@@ -575,10 +554,8 @@ def plot_circos(
             bin_size=bin_size,
             track_radii=track_r_pairs[track_idx],
             r_pad_ratio=track_r_pad,
-            y_step=y_step,
+            y_ticks=y_ticks[name],
             y_max=y_maxs[name],
-            y_num_steps_min=y_num_steps_min,
-            y_num_steps_max=y_num_steps_max,
             xticks_by_interval=xticks_per_track,
             xticks_orient=xticks_orient,
             color=palette[name],
@@ -646,7 +623,6 @@ def _draw_seqs(mapping, start, end, ax):
             ax.plot(x, y, color="black")
     ax.set_yticklabels([])
     ax.set_facecolor("white")
-    ax.set_title("Sequences")
     ax.set_xlim(start, end)
     ax.set_axis_off()
     return ax
@@ -658,6 +634,7 @@ def seq_view_plot(
     contig,
     start,
     end,
+    labels=False,
     axs=None,
     figsize=None,
     axvlines=None,
@@ -676,7 +653,11 @@ def seq_view_plot(
     rec_genes = get_graphic_record_genes(genome[contig], start, end, **genes_kwargs)
     rec_genes.plot(ax=axs[1])
     axs[1].set_xlim(start, end)
-    axs[1].set_title("Genes")
+    axs[1].set_xticks(nice_ticks(start, end, 5))
+
+    if labels:
+        axs[0].set_title("Reads")
+        axs[1].set_title("Genes")
 
     if axvlines is not None:
         axvlines_kwargs = {} if axvlines_kwargs is None else axvlines_kwargs

@@ -6,6 +6,7 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from dna_features_viewer import BiopythonTranslator, GraphicFeature, GraphicRecord
 from matplotlib.pyplot import Line2D
+from matplotlib.ticker import MaxNLocator
 
 
 # Class with label_fields class attribute over-written - needed due to product element
@@ -128,6 +129,13 @@ def get_gene_coverage(gene_start, gene_end, region_start, region_end):
             f"{gene_start=}, {gene_end=}, "
             f"insert_start={region_start}, insert_end={region_end}"
         )
+
+
+def nice_ticks(vmin, vmax, nbins=4):
+    loc = MaxNLocator(nbins=nbins, steps=[1, 2, 2.5, 5, 10], integer=True)
+    t = loc.tick_values(vmin, vmax)
+    # tick_values() overshoots the range; drop the extras
+    return t[(t >= vmin) & (t <= vmax)].astype(int)
 
 
 def get_genes_graphic_record(

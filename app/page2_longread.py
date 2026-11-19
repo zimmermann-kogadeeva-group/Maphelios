@@ -188,6 +188,17 @@ def plot_reads(results, supplementary=False, secondary=False):
     # To store the buffers that will hold the images
     svg_buffers = dict()
 
+    with st.expander("Plotting options"):
+        seq_view_opts = dict(
+            reads_height=st.slider(
+                "Reads view height:", 1.0, 10.0, 1.0, key="reads_height"
+            ),
+            genes_height=st.slider(
+                "Reads view height:", 1.0, 10.0, 3.0, key="genes_height"
+            ),
+            labels=st.toggle("Show labels", False),
+        )
+
     for genome_label, res in results.items():
         st.subheader(strip_ext(genome_label), divider="gray")
         contigs = res["genome"].keys()
@@ -217,7 +228,12 @@ def plot_reads(results, supplementary=False, secondary=False):
             )
 
         df_aln = res["mapping"].pipe(filter_reads, supplementary, secondary)
-        fig, axes = plt.subplots(2, 1)
+        h1 = seq_view_opts.pop("reads_height")
+        h2 = seq_view_opts.pop("genes_height")
+
+        fig, axes = plt.subplots(
+            2, 1, figsize=(6, h1 + h2), height_ratios=(h1, h2), sharex=True
+        )
         _ = pb.seq_view_plot(
             res["genome"],
             df_aln,
@@ -225,6 +241,7 @@ def plot_reads(results, supplementary=False, secondary=False):
             start=start,
             end=start + width,
             axs=axes,
+            labels=seq_view_opts["labels"],
         )
 
         # Save the svg figure in a buffer
