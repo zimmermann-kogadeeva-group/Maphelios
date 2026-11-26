@@ -7,8 +7,7 @@ from tempfile import TemporaryDirectory
 import streamlit as st
 from Bio import SeqIO
 
-from maphelios import Mapping
-from maphelios import pacbio as pb
+from maphelios import Mapping, ngs
 from maphelios.genome_funcs import get_genome, run_minimap2, run_tnseq_aln
 from maphelios.helper import quality_filter
 
@@ -237,7 +236,8 @@ def tool_description():
                 "marks one insertion site. |",
             ]
         )
-        st.markdown(f"""
+        st.markdown(
+            f"""
 **1. Choose a reference genome** - search NCBI by name or accession, or
 upload your own (GenBank, GFF with embedded sequence, or FASTA). Several
 genomes can be given at once, and the sequences are mapped to each one
@@ -255,7 +255,8 @@ genome and of individual inserts with the overlapping genes, and tables you
 can download.
 
 Not sure where to start? Load one of the example datasets below.
-""")
+"""
+        )
 
 
 def get_main_inputs(workdir=False):
@@ -490,7 +491,7 @@ def run_pipeline(
 
                 run_minimap2(seq_path, genome_path, dirpath / "aln.sam")
 
-                aln = pb.get_longread_aln(
+                aln = ngs.get_longread_aln(
                     dirpath / "aln.sam", dropna=True, blast_like_score=True
                 )
 
@@ -510,7 +511,7 @@ def run_pipeline(
                     cutadapt_kwargs=dict(adaptor=adaptor_3p, front=adaptor_5p),
                 )
 
-                aln = pb.get_shortread_aln(
+                aln = ngs.get_shortread_aln(
                     dirpath / "aln.sam", blast_like_score=True
                 ).assign(reference_end=lambda x: x.reference_start + 1)
 

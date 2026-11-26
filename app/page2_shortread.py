@@ -7,7 +7,7 @@ import pandas as pd
 import seaborn as sns
 import streamlit as st
 
-from maphelios import pacbio as pb
+from maphelios import ngs
 from maphelios.helper import get_genes, get_graphic_record_genes, nice_ticks
 
 FORMATS = (".gff", ".gbk", ".fasta")
@@ -150,7 +150,7 @@ def plot_genomes(results, supplementary=False, secondary=False):
 
         df_aln = res["mapping"].pipe(filter_reads, supplementary, secondary)
 
-        _, circos = pb.plot_circos(df_aln, res["genome"], ax=ax, **circos_opts)
+        _, circos = ngs.plot_circos(df_aln, res["genome"], ax=ax, **circos_opts)
 
         # Save the svg figure in a buffer
         img_buffer = BytesIO()
@@ -278,7 +278,7 @@ def plot_reads(results, supplementary=False, secondary=False):
         )
         if len(df_genes):
             df_genes = df_genes.drop(columns=["sequence"]).pipe(
-                pb.reorder_cols, cols_order
+                ngs.reorder_cols, cols_order
             )
         with st.expander("Table of genes", key=f"genes_table_{genome_label}"):
             st.write(df_genes)

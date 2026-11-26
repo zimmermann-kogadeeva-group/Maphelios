@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
-from maphelios import pacbio as pb
+from maphelios import ngs
 from maphelios.helper import get_genes
 
 FORMATS = (".gff", ".gbk", ".fasta")
@@ -105,7 +105,7 @@ def qc_plots(mapping, genome):
 
     # Get contig lengths
     contig_length = {k: len(v) for k, v in genome.items()}
-    counts_df = pb.bin_all_contigs(
+    counts_df = ngs.bin_all_contigs(
         mapping, contig_lengths=contig_length, bin_size=1, group=None, as_df=True
     )
 
@@ -161,7 +161,7 @@ def plot_genomes(results, supplementary=False, secondary=False):
 
         df_aln = res["mapping"].pipe(filter_reads, supplementary, secondary)
 
-        _, circos = pb.plot_circos(df_aln, res["genome"], ax=ax, **circos_opts)
+        _, circos = ngs.plot_circos(df_aln, res["genome"], ax=ax, **circos_opts)
 
         # Save the svg figure in a buffer
         img_buffer = BytesIO()
@@ -244,7 +244,7 @@ def plot_reads(results, supplementary=False, secondary=False):
         fig, axes = plt.subplots(
             2, 1, figsize=(6, h1 + h2), height_ratios=(h1, h2), sharex=True
         )
-        _ = pb.seq_view_plot(
+        _ = ngs.seq_view_plot(
             res["genome"],
             df_aln,
             contig=contig_choice,
@@ -268,7 +268,7 @@ def plot_reads(results, supplementary=False, secondary=False):
         df_genes = (
             get_genes(res["genome"][contig_choice], start, start + width, as_df=True)
             .drop(columns=["sequence"])
-            .pipe(pb.reorder_cols, cols_order)
+            .pipe(ngs.reorder_cols, cols_order)
         )
         with st.expander("Table of genes", key=f"genes_table_{genome_label}"):
             st.write(df_genes)
